@@ -220,12 +220,12 @@ class _QuoteOfTheDayScreenState extends State<QuoteOfTheDayScreen>
                                   borderRadius: BorderRadius.circular(18),
                                   child: Image.network(
                                     cover,
-                                    width: 200,
-                                    height: 280,
+                                    width: 160,   // 🔹 antes: 200
+                                    height: 220,  // 🔹 antes: 280
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, _, __) => Container(
-                                      width: 210,
-                                      height: 280,
+                                      width: 160,
+                                      height: 220,
                                       color: Colors.black26,
                                     ),
                                   ),
@@ -233,29 +233,26 @@ class _QuoteOfTheDayScreenState extends State<QuoteOfTheDayScreen>
                               ),
                             const SizedBox(height: 36),
                             // 🔹 Citação adaptável e truncável
+                            // 🔹 Citação adaptável sem truncamento
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                double fontSize = 28;
-                                const double minFontSize = 18;
-                                const int maxLines = 10;
-
                                 final text = q['text'] ?? '';
-                                if (text.length > 400) fontSize = 24;
-                                if (text.length > 600) fontSize = 22;
-                                if (text.length > 800) fontSize = 20;
-                                if (text.length > 1000) fontSize = minFontSize;
 
-                                final displayText = text.length > 1200
-                                    ? '${text.substring(0, 1150).trim()}...'
-                                    : text;
+                                // define o tamanho inicial e o limite mínimo
+                                double fontSize = 24;
+                                const double minFontSize = 14;
+
+                                // reduz gradualmente conforme o comprimento do texto
+                                if (text.length > 400) fontSize = 20;
+                                if (text.length > 600) fontSize = 18;
+                                if (text.length > 800) fontSize = 16;
+                                if (text.length > 1000) fontSize = minFontSize;
 
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 10.0),
                                   child: Text(
-                                    displayText,
+                                    text,
                                     textAlign: TextAlign.center,
-                                    overflow: TextOverflow.fade,
-                                    maxLines: maxLines,
                                     softWrap: true,
                                     style: TextStyle(
                                       fontSize: fontSize,
@@ -268,6 +265,7 @@ class _QuoteOfTheDayScreenState extends State<QuoteOfTheDayScreen>
                                 );
                               },
                             ),
+
                             const SizedBox(height: 36),
                             // 🔹 Título adaptável refinado e autor sempre visível
                             LayoutBuilder(
