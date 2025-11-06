@@ -75,7 +75,6 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     }
   }
 
-
   void _changeSortMode(String mode) {
     setState(() => _sortMode = mode);
     _fetchFavorites(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
@@ -113,6 +112,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     const green = Color(0xFF2F7D32);
     const blue = Color(0xFF275D8C);
     const cyan = Color(0xFF118EA8);
+    const gray = Color(0xFF5A5A5A); // 🆕 tipo 6 (cinza)
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -160,6 +160,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                   _typeDot(3, green),
                   _typeDot(4, blue),
                   _typeDot(5, cyan),
+                  _typeDot(6, gray), // 🆕 bolinha cinza adicionada
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward, color: Colors.white70),

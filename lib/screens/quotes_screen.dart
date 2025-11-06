@@ -84,6 +84,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     const green = Color(0xFF2F7D32);
     const blue = Color(0xFF275D8C);
     const cyan = Color(0xFF118EA8);
+    const gray = Color(0xFF5A5A5A); // 🆕 tipo 6 (cinza)
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -133,6 +134,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                   _typeDot(3, green),
                   _typeDot(4, blue),
                   _typeDot(5, cyan),
+                  _typeDot(6, gray), // 🆕 bolinha cinza adicionada
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward, color: Colors.white70),

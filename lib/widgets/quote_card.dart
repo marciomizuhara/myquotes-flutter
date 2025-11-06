@@ -74,6 +74,77 @@ class _QuoteCardState extends State<QuoteCard> {
     }
   }
 
+  Future<void> _showTypeSelector(BuildContext context, int currentType) async {
+    final colors = {
+      1: const Color(0xFF9B2C2C), // vermelho
+      2: const Color(0xFFB8961A), // amarelo
+      3: const Color(0xFF2F7D32), // verde
+      4: const Color(0xFF275D8C), // azul
+      5: const Color(0xFF118EA8), // ciano
+      6: const Color(0xFF5A5A5A), // cinza (quotes de interesse)
+    };
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1A1A1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: colors.entries.map((entry) {
+              final isActive = entry.key == currentType;
+              return GestureDetector(
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _updateQuoteType(entry.key);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: isActive ? 28 : 22,
+                  height: isActive ? 28 : 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: entry.value,
+                    boxShadow: isActive
+                        ? [
+                            BoxShadow(
+                              color: entry.value.withOpacity(0.8),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            )
+                          ]
+                        : [],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _updateQuoteType(int newType) async {
+    try {
+      await supabase
+          .from('quotes')
+          .update({'type': newType})
+          .eq('id', widget.quote['id']);
+
+      setState(() {
+        widget.quote['type'] = newType;
+      });
+
+      debugPrint('🟢 Tipo da quote atualizado para $newType');
+    } catch (e) {
+      debugPrint('❌ Erro ao atualizar tipo: $e');
+    }
+  }
+
   int _safeType(dynamic rawType) {
     if (rawType == null) return 0;
     if (rawType is int) return rawType;
@@ -159,12 +230,15 @@ class _QuoteCardState extends State<QuoteCard> {
                           if (q['page'] != null)
                             Padding(
                               padding: const EdgeInsets.only(left: 4, bottom: 1),
-                              child: Text(
-                                'p. ${q['page']}',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 9.5,
+                              child: GestureDetector(
+                                onTap: () => _showTypeSelector(context, _safeType(q['type'])),
+                                child: Text(
+                                  'p. ${q['page']}',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontStyle: FontStyle.italic,
+                                    fontSize: 9.5,
+                                  ),
                                 ),
                               ),
                             ),

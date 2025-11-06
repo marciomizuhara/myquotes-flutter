@@ -38,7 +38,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
   Future<void> _fetchQuotes({String? term}) async {
     setState(() => isLoading = true);
 
-    // ✅ Mantém sempre o bookId para evitar que traga todas as citações
     final data = await QuotesHelper.fetchQuotes(
       term: term,
       selectedType: selectedType,
@@ -60,8 +59,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
         setState(() {
           selectedType = active ? null : t;
         });
-
-        // ✅ Mantém o filtro de livro ao trocar o tipo
         _fetchQuotes(term: searchCtrl.text);
       },
       child: Container(
@@ -87,6 +84,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
     const green = Color(0xFF2F7D32);
     const blue = Color(0xFF275D8C);
     const cyan = Color(0xFF118EA8);
+    const gray = Color(0xFF5A5A5A); // 🆕 tipo 6 (cinza)
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -126,7 +124,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Capa
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: Image.network(
@@ -143,8 +140,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                   ),
                 ),
                 const SizedBox(width: 14),
-
-                // Informações do livro
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,8 +192,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                     searchCtrl.clear();
                     selectedType = null;
                     FocusScope.of(context).unfocus();
-
-                    // ✅ Garante que o bookId seja preservado ao limpar busca
                     _fetchQuotes();
                   },
                 ),
@@ -211,7 +204,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                 contentPadding:
                     const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
-              // ✅ Mantém bookId também na busca
               onSubmitted: (term) => _fetchQuotes(term: term),
             ),
           ),
@@ -225,6 +217,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
               _typeDot(3, green),
               _typeDot(4, blue),
               _typeDot(5, cyan),
+              _typeDot(6, gray), // 🆕 bolinha cinza adicionada
             ],
           ),
           const SizedBox(height: 6),
@@ -234,7 +227,6 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
-                    // ✅ Passa o bookId para o refresh também
                     onRefresh: () => _fetchQuotes(term: searchCtrl.text),
                     child: ListView.builder(
                       padding: const EdgeInsets.all(12),
