@@ -85,7 +85,7 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
               label: 'Characters',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.star),
+              icon: Icon(Icons.favorite),
               label: 'Favorites',
             ),
           ],

@@ -28,7 +28,7 @@ class _QuoteCardState extends State<QuoteCard> {
     final raw = widget.quote['is_favorite'];
     _isFavorite = raw == 1 || raw == true || raw == '1';
 
-    debugPrint('🟨 initState → id=${widget.quote['id']} is_favorite=$raw (_isFavorite=$_isFavorite)');
+    debugPrint('❤️ initState → id=${widget.quote['id']} is_favorite=$raw (_isFavorite=$_isFavorite)');
   }
 
   Future<void> _updateNotes(String newText) async {
@@ -48,7 +48,7 @@ class _QuoteCardState extends State<QuoteCard> {
 
   Future<void> _toggleFavorite() async {
     try {
-      debugPrint('🟡 Toggle iniciado para ID ${widget.quote['id']} | valor atual=$_isFavorite');
+      debugPrint('❤️ Toggle iniciado para ID ${widget.quote['id']} | valor atual=$_isFavorite');
 
       final newValue = _isFavorite ? 0 : 1;
 
@@ -66,7 +66,7 @@ class _QuoteCardState extends State<QuoteCard> {
           .select('is_favorite')
           .maybeSingle();
 
-      debugPrint('🧩 Supabase retorno → id=${widget.quote['id']} valor=${updated?['is_favorite']} (${updated?['is_favorite']?.runtimeType})');
+      debugPrint('💾 Supabase retorno → id=${widget.quote['id']} valor=${updated?['is_favorite']} (${updated?['is_favorite']?.runtimeType})');
 
       widget.onFavoriteChanged?.call();
     } catch (e) {
@@ -349,8 +349,8 @@ class _QuoteCardState extends State<QuoteCard> {
             constraints: const BoxConstraints(),
             visualDensity: VisualDensity.compact,
             icon: Icon(
-              _isFavorite ? Icons.star : Icons.star_border,
-              color: _isFavorite ? Colors.yellowAccent : Colors.white38,
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.redAccent : Colors.white38,
               size: 17,
             ),
             tooltip: _isFavorite
