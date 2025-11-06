@@ -4,10 +4,10 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Screens
-import 'screens/random_quotes_screen.dart';
-import 'screens/all_quotes_screen.dart';
+import 'screens/quotes_screen.dart';
 import 'screens/books_screen.dart';
 import 'screens/characters_screen.dart';
+import 'screens/favorites_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +23,7 @@ Future<void> main() async {
     }
   }
 
-  // ❌ Removemos o dotenv.load() — ele tenta acessar arquivo físico no Android
-  // ✅ Passamos o mapa diretamente para o Supabase
+  // ✅ Inicializa o Supabase diretamente com o mapa
   try {
     debugPrint('🌐 URL: "${envMap['SUPABASE_URL']}"');
     debugPrint('🔑 KEY: "${envMap['SUPABASE_ANON_KEY']}"');
@@ -40,8 +39,6 @@ Future<void> main() async {
   runApp(MyQuotesApp());
 }
 
-
-
 class MyQuotesApp extends StatefulWidget {
   @override
   State<MyQuotesApp> createState() => _MyQuotesAppState();
@@ -53,10 +50,10 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      RandomQuotesScreen(),
-      AllQuotesScreen(),
-      BooksScreen(),
-      CharactersScreen(),
+      const QuotesScreen(), // 0
+      const BooksScreen(), // 1
+      const CharactersScreen(), // 2
+      const FavoriteQuotesScreen(), // 3 ← nova aba
     ];
 
     return MaterialApp(
@@ -76,12 +73,8 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
           onTap: (i) => setState(() => _tab = i),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.shuffle),
-              label: 'Random',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.format_quote),
-              label: 'All Quotes',
+              label: 'Quotes',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.book),
@@ -90,6 +83,10 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
             BottomNavigationBarItem(
               icon: Icon(Icons.person),
               label: 'Characters',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.star),
+              label: 'Favorites',
             ),
           ],
         ),

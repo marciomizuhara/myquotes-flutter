@@ -37,11 +37,14 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
 
   Future<void> _fetchQuotes({String? term}) async {
     setState(() => isLoading = true);
+
+    // ✅ Mantém sempre o bookId para evitar que traga todas as citações
     final data = await QuotesHelper.fetchQuotes(
       term: term,
       selectedType: selectedType,
       bookId: widget.bookId,
     );
+
     setState(() {
       quotes = data;
       isLoading = false;
@@ -57,6 +60,8 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
         setState(() {
           selectedType = active ? null : t;
         });
+
+        // ✅ Mantém o filtro de livro ao trocar o tipo
         _fetchQuotes(term: searchCtrl.text);
       },
       child: Container(
@@ -103,13 +108,12 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                     bookId: widget.bookId,
                     bookTitle: widget.bookTitle,
                     bookAuthor: widget.bookAuthor,
-                    bookCover: widget.bookCover, //
+                    bookCover: widget.bookCover,
                   ),
                 ),
               );
             },
           ),
-
         ],
       ),
 
@@ -193,6 +197,8 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                     searchCtrl.clear();
                     selectedType = null;
                     FocusScope.of(context).unfocus();
+
+                    // ✅ Garante que o bookId seja preservado ao limpar busca
                     _fetchQuotes();
                   },
                 ),
@@ -205,6 +211,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                 contentPadding:
                     const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
+              // ✅ Mantém bookId também na busca
               onSubmitted: (term) => _fetchQuotes(term: term),
             ),
           ),
@@ -227,7 +234,8 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
-                    onRefresh: _fetchQuotes,
+                    // ✅ Passa o bookId para o refresh também
+                    onRefresh: () => _fetchQuotes(term: searchCtrl.text),
                     child: ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: quotes.length,
