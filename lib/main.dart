@@ -8,6 +8,7 @@ import 'screens/quotes_screen.dart';
 import 'screens/books_screen.dart';
 import 'screens/characters_screen.dart';
 import 'screens/favorites_screen.dart';
+import 'screens/quote_of_the_day_screen.dart'; // 🆕 nova tela adicionada
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,10 +51,11 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      const QuotesScreen(), // 0
-      const BooksScreen(), // 1
-      const CharactersScreen(), // 2
-      const FavoriteQuotesScreen(), // 3 ← nova aba
+      const QuotesScreen(),           // 0
+      const QuoteOfTheDayScreen(),    // 1 🆕 nova tela
+      const BooksScreen(),            // 2
+      const CharactersScreen(),       // 3
+      const FavoriteQuotesScreen(),   // 4
     ];
 
     return MaterialApp(
@@ -75,6 +77,10 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
             BottomNavigationBarItem(
               icon: Icon(Icons.format_quote),
               label: 'Quotes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_outlined), // 📅 nova aba
+              label: 'Quote of the Day',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.book),
