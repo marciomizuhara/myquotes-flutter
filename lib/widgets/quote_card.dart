@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import '../utils/colors.dart';
 
 class QuoteCard extends StatefulWidget {
@@ -76,12 +77,12 @@ class _QuoteCardState extends State<QuoteCard> {
 
   Future<void> _showTypeSelector(BuildContext context, int currentType) async {
     final colors = {
-      1: const Color(0xFF9B2C2C), // vermelho
-      2: const Color(0xFFB8961A), // amarelo
-      3: const Color(0xFF2F7D32), // verde
-      4: const Color(0xFF275D8C), // azul
-      5: const Color(0xFF118EA8), // ciano
-      6: const Color(0xFF5A5A5A), // cinza (quotes de interesse)
+      1: const Color(0xFF9B2C2C),
+      2: const Color(0xFFB8961A),
+      3: const Color(0xFF2F7D32),
+      4: const Color(0xFF275D8C),
+      5: const Color(0xFF118EA8),
+      6: const Color(0xFF5A5A5A),
     };
 
     await showModalBottomSheet(
@@ -152,6 +153,23 @@ class _QuoteCardState extends State<QuoteCard> {
     return int.tryParse(rawType.toString()) ?? 0;
   }
 
+  void _copyQuote(Map<String, dynamic> q) {
+    final text = q['text'] ?? '';
+    final author = q['books']?['author'] ?? 'Autor desconhecido';
+    final title = q['books']?['title'] ?? 'Livro não informado';
+    final formatted = '$text\n\n$author - $title';
+    Clipboard.setData(ClipboardData(text: formatted));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📋 Citação copiada!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.black87,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final q = widget.quote;
@@ -162,100 +180,103 @@ class _QuoteCardState extends State<QuoteCard> {
     final color = colorByType(_safeType(q['type']));
     final note = _notesCtrl.text.trim();
 
-    return Card(
-      color: color,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 2),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (cover.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      cover,
-                      width: 48,
-                      height: 70,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, _, __) =>
-                          Container(width: 48, height: 70, color: Colors.black26),
-                    ),
-                  ),
-                if (cover.isNotEmpty) const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        q['text'] ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          height: 1.3,
-                          fontSize: 13.5,
-                          letterSpacing: 0.05,
-                        ),
+    return GestureDetector(
+      onDoubleTap: () => _copyQuote(q),
+      child: Card(
+        color: color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 2),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (cover.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        cover,
+                        width: 48,
+                        height: 70,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, _, __) =>
+                            Container(width: 48, height: 70, color: Colors.black26),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  book['title'] ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.amberAccent,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                                Text(
-                                  book['author'] ?? '',
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 8.5,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ],
-                            ),
+                    ),
+                  if (cover.isNotEmpty) const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          q['text'] ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            height: 1.3,
+                            fontSize: 13.5,
+                            letterSpacing: 0.05,
                           ),
-                          if (q['page'] != null)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4, bottom: 1),
-                              child: GestureDetector(
-                                onTap: () => _showTypeSelector(context, _safeType(q['type'])),
-                                child: Text(
-                                  'p. ${q['page']}',
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontStyle: FontStyle.italic,
-                                    fontSize: 9.5,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    book['title'] ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.amberAccent,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  Text(
+                                    book['author'] ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 8.5,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (q['page'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4, bottom: 1),
+                                child: GestureDetector(
+                                  onTap: () => _showTypeSelector(context, _safeType(q['type'])),
+                                  child: Text(
+                                    'p. ${q['page']}',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: 9.5,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 2, left: 0, bottom: 0),
-              child: _editing
-                  ? _buildEditRow(note)
-                  : _buildNormalRow(note),
-            ),
-          ],
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2, left: 0, bottom: 0),
+                child: _editing
+                    ? _buildEditRow(note)
+                    : _buildNormalRow(note),
+              ),
+            ],
+          ),
         ),
       ),
     );

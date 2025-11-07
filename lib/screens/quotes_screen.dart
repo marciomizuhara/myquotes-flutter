@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
 import '../utils/quotes_helper.dart';
 
@@ -35,7 +36,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
       selectedType: selectedType,
     );
 
-    // 🔹 Garante que todas as quotes venham com is_favorite coerente (int)
     final normalized = data.map((q) {
       q['is_favorite'] = (q['is_favorite'] ?? 0) == 1 ? 1 : 0;
       return q;
@@ -50,6 +50,23 @@ class _QuotesScreenState extends State<QuotesScreen> {
   void _changeSortMode(String mode) {
     setState(() => _sortMode = mode);
     _fetchQuotes(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
+  }
+
+  void _copyQuote(Map<String, dynamic> q) {
+    final text = q['text'] ?? '';
+    final author = q['books']?['author'] ?? 'Autor desconhecido';
+    final title = q['books']?['title'] ?? 'Livro não informado';
+    final formatted = '$text\n\npor $author, em $title';
+    Clipboard.setData(ClipboardData(text: formatted));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📋 Citação copiada!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.black87,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Widget _typeDot(int t, Color fill) {
@@ -84,7 +101,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     const green = Color(0xFF2F7D32);
     const blue = Color(0xFF275D8C);
     const cyan = Color(0xFF118EA8);
-    const gray = Color(0xFF5A5A5A); // 🆕 tipo 6 (cinza)
+    const gray = Color(0xFF5A5A5A);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -134,7 +151,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                   _typeDot(3, green),
                   _typeDot(4, blue),
                   _typeDot(5, cyan),
-                  _typeDot(6, gray), // 🆕 bolinha cinza adicionada
+                  _typeDot(6, gray),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward, color: Colors.white70),
@@ -165,16 +182,21 @@ class _QuotesScreenState extends State<QuotesScreen> {
                       child: ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: quotes.length,
-                        itemBuilder: (context, i) => QuoteCard(
-                          quote: quotes[i],
-                          onFavoriteChanged: () {
-                            // 🔹 Atualiza apenas o item alterado
-                            setState(() {
-                              quotes[i]['is_favorite'] =
-                                  quotes[i]['is_favorite'] == 1 ? 0 : 1;
-                            });
-                          },
-                        ),
+                        itemBuilder: (context, i) {
+                          final q = quotes[i];
+                          return GestureDetector(
+                            onDoubleTap: () => _copyQuote(q),
+                            child: QuoteCard(
+                              quote: q,
+                              onFavoriteChanged: () {
+                                setState(() {
+                                  quotes[i]['is_favorite'] =
+                                      quotes[i]['is_favorite'] == 1 ? 0 : 1;
+                                });
+                              },
+                            ),
+                          );
+                        },
                       ),
                     ),
             ),

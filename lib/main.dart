@@ -8,7 +8,8 @@ import 'screens/quotes_screen.dart';
 import 'screens/books_screen.dart';
 import 'screens/characters_screen.dart';
 import 'screens/favorites_screen.dart';
-import 'screens/quote_of_the_day_screen.dart'; // 🆕 nova tela adicionada
+import 'screens/quote_of_the_day_screen.dart';
+import 'screens/writers_screen.dart'; // 🆕 nova tela adicionada
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,10 +53,12 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
   Widget build(BuildContext context) {
     final pages = [
       const QuotesScreen(),           // 0
-      const QuoteOfTheDayScreen(),    // 1 🆕 nova tela
-      const BooksScreen(),            // 2
-      const CharactersScreen(),       // 3
-      const FavoriteQuotesScreen(),   // 4
+      const QuoteOfTheDayScreen(),    // 1
+      const FavoriteQuotesScreen(),   // 2
+      const BooksScreen(),            // 3
+      const WritersScreen(),          // 4 🆕 nova tela
+      const CharactersScreen(),       // 5
+
     ];
 
     return MaterialApp(
@@ -79,21 +82,26 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
               label: 'Quotes',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined), // 📅 nova aba
+              icon: Icon(Icons.calendar_today_outlined),
               label: 'Quote of the Day',
             ),
+            BottomNavigationBarItem(
+                          icon: Icon(Icons.favorite),
+                          label: 'Favorites',
+                        ),
             BottomNavigationBarItem(
               icon: Icon(Icons.book),
               label: 'Books',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Characters',
+              icon: Icon(Icons.person_outline),
+              label: 'Writers', // 🆕 nova aba
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite),
-              label: 'Favorites',
+              icon: Icon(Icons.group),
+              label: 'Characters',
             ),
+
           ],
         ),
       ),

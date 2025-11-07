@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
 
 class FavoriteQuotesScreen extends StatefulWidget {
@@ -80,6 +81,23 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     _fetchFavorites(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
   }
 
+  void _copyQuote(Map<String, dynamic> q) {
+    final text = q['text'] ?? '';
+    final author = q['books']?['author'] ?? 'Autor desconhecido';
+    final title = q['books']?['title'] ?? 'Livro não informado';
+    final formatted = '$text\n\n$author - $title';
+    Clipboard.setData(ClipboardData(text: formatted));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📋 Citação copiada!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.black87,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Widget _typeDot(int t, Color fill) {
     final bool active = selectedType == t;
     return GestureDetector(
@@ -112,7 +130,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     const green = Color(0xFF2F7D32);
     const blue = Color(0xFF275D8C);
     const cyan = Color(0xFF118EA8);
-    const gray = Color(0xFF5A5A5A); // 🆕 tipo 6 (cinza)
+    const gray = Color(0xFF5A5A5A);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -160,7 +178,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                   _typeDot(3, green),
                   _typeDot(4, blue),
                   _typeDot(5, cyan),
-                  _typeDot(6, gray), // 🆕 bolinha cinza adicionada
+                  _typeDot(6, gray),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward, color: Colors.white70),
@@ -200,16 +218,22 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                           child: ListView.builder(
                             padding: const EdgeInsets.all(12),
                             itemCount: quotes.length,
-                            itemBuilder: (context, i) => QuoteCard(
-                              quote: quotes[i],
-                              onFavoriteChanged: () async {
-                                if ((quotes[i]['is_favorite'] ?? 0) == 0) {
-                                  setState(() => quotes.removeAt(i));
-                                } else {
-                                  setState(() {});
-                                }
-                              },
-                            ),
+                            itemBuilder: (context, i) {
+                              final q = quotes[i];
+                              return GestureDetector(
+                                onDoubleTap: () => _copyQuote(q),
+                                child: QuoteCard(
+                                  quote: q,
+                                  onFavoriteChanged: () async {
+                                    if ((quotes[i]['is_favorite'] ?? 0) == 0) {
+                                      setState(() => quotes.removeAt(i));
+                                    } else {
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                              );
+                            },
                           ),
                         ),
             ),
