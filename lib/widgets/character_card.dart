@@ -16,33 +16,25 @@ class CharacterCard extends StatefulWidget {
 }
 
 class _CharacterCardState extends State<CharacterCard> {
-  bool isEditing = false;
-  late TextEditingController ratingCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    ratingCtrl = TextEditingController(
-      text: (widget.character['rating'] ?? 0.0).toStringAsFixed(1),
-    );
-  }
-
-  @override
-  void dispose() {
-    ratingCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _updateRating() async {
-    final newRating = double.tryParse(ratingCtrl.text) ?? 0.0;
+  Future<void> _updateRating(double newValue) async {
     await CharactersHelper.supabase
         .from('characters')
-        .update({'rating': newRating})
+        .update({'rating': newValue})
         .eq('id', widget.character['id']);
-    setState(() {
-      widget.character['rating'] = newRating;
-      isEditing = false;
-    });
+  }
+
+  void _increaseRating() async {
+    final current = (widget.character['rating'] ?? 0.0).toDouble();
+    final newRating = (current + 0.1).clamp(0.0, 10.0);
+    setState(() => widget.character['rating'] = newRating);
+    await _updateRating(newRating);
+  }
+
+  void _decreaseRating() async {
+    final current = (widget.character['rating'] ?? 0.0).toDouble();
+    final newRating = (current - 0.1).clamp(0.0, 10.0);
+    setState(() => widget.character['rating'] = newRating);
+    await _updateRating(newRating);
   }
 
   @override
@@ -58,10 +50,10 @@ class _CharacterCardState extends State<CharacterCard> {
 
     return Card(
       color: const Color(0xFF1E1E1E),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8), // antes 12 → mais compacto
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -70,22 +62,22 @@ class _CharacterCardState extends State<CharacterCard> {
               children: [
                 if (widget.showBook && cover.isNotEmpty)
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
                     child: Image.network(
                       cover,
-                      height: 65,
-                      width: 45,
+                      height: 55,
+                      width: 38,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        height: 65,
-                        width: 45,
+                        height: 55,
+                        width: 38,
                         color: Colors.black26,
                         child: const Icon(Icons.broken_image,
-                            color: Colors.white38, size: 20),
+                            color: Colors.white38, size: 18),
                       ),
                     ),
                   ),
-                if (widget.showBook) const SizedBox(width: 12),
+                if (widget.showBook) const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,16 +86,16 @@ class _CharacterCardState extends State<CharacterCard> {
                         name,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: 19,
                           color: Colors.white,
                         ),
                       ),
                       if (widget.showBook && title.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           title,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 10.5,
                             color: Colors.white70,
                           ),
                         ),
@@ -112,69 +104,62 @@ class _CharacterCardState extends State<CharacterCard> {
                   ),
                 ),
 
-                // 🔹 Rating editável inline
-                isEditing
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 46,
-                            child: TextField(
-                              controller: ratingCtrl,
-                              style: const TextStyle(color: Colors.white),
-                              textAlign: TextAlign.center,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(decimal: true),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                                contentPadding:
-                                    EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.check, color: Colors.greenAccent),
-                            onPressed: _updateRating,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.redAccent),
-                            onPressed: () => setState(() => isEditing = false),
-                          ),
-                        ],
-                      )
-                    : GestureDetector(
-                        onTap: () => setState(() => isEditing = true),
-                        child: Text(
-                          rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+                // 🔹 Novo controle de rating com setas ↑ ↓
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: _increaseRating,
+                      child: const Icon(
+                        Icons.arrow_drop_up,
+                        color: Color(0xFF444444), // cinza suave sobre fundo #1E1E1E
+                        size: 22, // levemente menor (antes 26)
                       ),
+                    ),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _decreaseRating,
+                      child: const Icon(
+                        Icons.arrow_drop_down,
+                        color: Color(0xFF444444),
+                        size: 22,
+                      ),
+                    ),
+                  ],
+                )
+
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             if (desc.isNotEmpty)
               Text(
                 desc,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 14,
-                  height: 1.4,
+                  fontSize: 13,
+                  height: 1.3,
                 ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             if (tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 tags,
                 style: const TextStyle(
                   color: Colors.white70,
-                  fontSize: 13,
+                  fontSize: 12,
                   fontStyle: FontStyle.italic,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ],

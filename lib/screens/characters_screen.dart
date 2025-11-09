@@ -65,10 +65,13 @@ class _CharactersScreenState extends State<CharactersScreen> {
   }
 
   void _setOrder(String mode) {
-    if (orderMode == mode) return;
+    // Só impede recarregar se for o mesmo modo E não for random
+    if (orderMode == mode && mode != 'random') return;
+
     setState(() => orderMode = mode);
     _fetchCharacters();
   }
+
 
   @override
   Widget build(BuildContext context) {

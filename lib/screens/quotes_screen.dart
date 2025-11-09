@@ -18,12 +18,12 @@ class _QuotesScreenState extends State<QuotesScreen> {
   bool isLoading = true;
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
-  String _sortMode = 'random'; // ✅ modo padrão ao abrir
+  String _sortMode = 'random'; // modo padrão
 
   @override
   void initState() {
     super.initState();
-    _fetchQuotes(); // já usa random por padrão
+    _fetchQuotes();
   }
 
   Future<void> _fetchQuotes({String? term}) async {
@@ -34,6 +34,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     final data = await QuotesHelper.fetchQuotes(
       term: term,
       selectedType: selectedType,
+      sortMode: _sortMode, // ✅ adicionamos aqui
     );
 
     final normalized = data.map((q) {
@@ -154,19 +155,19 @@ class _QuotesScreenState extends State<QuotesScreen> {
                   _typeDot(6, gray),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
-                    tooltip: 'Mais antigas',
-                    onPressed: () => _changeSortMode('oldest'),
+                    icon: const Icon(Icons.arrow_upward, color: Colors.white70),
+                    tooltip: 'Newest',
+                    onPressed: () => _changeSortMode('one_per_book_desc'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.shuffle, color: Colors.white70),
-                    tooltip: 'Aleatórias',
+                    tooltip: 'Shuffle',
                     onPressed: () => _changeSortMode('random'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_upward, color: Colors.white70),
-                    tooltip: 'Mais recentes',
-                    onPressed: () => _changeSortMode('newest'),
+                    tooltip: 'Oldest',
+                    onPressed: () => _changeSortMode('one_per_book_asc'),
                   ),
                 ],
               ),

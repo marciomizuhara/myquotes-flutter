@@ -10,11 +10,28 @@ class QuotesHelper {
     String? term,
     int? selectedType,
     int? bookId,
+    String? sortMode, // ✅ parâmetro opcional
   }) async {
     try {
       List<dynamic> data = [];
 
-      if (term != null && term.trim().isNotEmpty) {
+      // 🔸 Novo modo especial — 1 citação aleatória por livro (DESC)
+      if (sortMode == 'one_per_book_desc' || currentSortMode == 'one_per_book') {
+        print('📚 Modo especial: uma citação por livro (DESC)');
+        final res = await supabase.rpc('get_one_random_quote_per_book');
+        data = (res as List);
+      }
+
+      // 🔸 Novo modo especial — 1 citação aleatória por livro (ASC)
+      else if (sortMode == 'one_per_book_asc' ||
+          currentSortMode == 'one_per_book_asc') {
+        print('📗 Modo especial: uma citação por livro (ASC)');
+        final res = await supabase.rpc('get_one_random_quote_per_book_asc');
+        data = (res as List);
+      }
+
+      // 🔸 Busca com termo
+      else if (term != null && term.trim().isNotEmpty) {
         final rawTerm = term.trim();
 
         // 🧠 Lógica combinada de AND / OR
@@ -23,7 +40,6 @@ class QuotesHelper {
           final Map<int, Map<String, dynamic>> allResults = {};
 
           for (var orSegment in orParts) {
-            // cada segmento pode ter AND dentro dele
             final andParts = orSegment.split(' AND ');
             List<Map<String, dynamic>>? andResult;
 
@@ -38,17 +54,15 @@ class QuotesHelper {
               final List<Map<String, dynamic>> current =
                   (res as List).map((e) => Map<String, dynamic>.from(e)).toList();
 
-              // 🔹 se é o primeiro termo do AND, inicia
               if (andResult == null) {
                 andResult = current;
               } else {
-                // 🔹 interseção (mantém apenas IDs que aparecem em ambos)
                 final ids = andResult.map((q) => q['id']).toSet();
-                andResult = current.where((q) => ids.contains(q['id'])).toList();
+                andResult =
+                    current.where((q) => ids.contains(q['id'])).toList();
               }
             }
 
-            // adiciona resultado do segmento (após aplicar AND)
             if (andResult != null) {
               for (final q in andResult) {
                 final id = int.tryParse(q['id'].toString()) ?? 0;
@@ -60,7 +74,6 @@ class QuotesHelper {
           data = allResults.values.toList();
           print('🔎 Busca combinada OR/AND → ${data.length} resultados totais');
         } else {
-          // 🔹 busca normal (sem operadores)
           final res = await supabase.rpc('search_quotes', params: {
             'search_term': rawTerm,
           });
@@ -77,8 +90,10 @@ class QuotesHelper {
           print(
               '🔍 Filtro pós-RPC aplicado → ${data.length} citações correspondem ao book_id=$bookId');
         }
-      } else {
-        // 🔸 Busca geral sem termo
+      }
+
+      // 🔸 Busca geral sem termo
+      else {
         List<int>? filteredIds;
         if (bookId != null) {
           final idsRes = await supabase
@@ -172,7 +187,6 @@ class QuotesHelper {
       return [];
     }
   }
-
 
   // 🔹 Buscar lista de autores e contagem de livros
   static Future<List<Map<String, dynamic>>> fetchWriters() async {
