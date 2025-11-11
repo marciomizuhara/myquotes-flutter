@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // ✅ adicionado
+
+// Utils
+import 'utils/quotes_cache_manager.dart'; // ✅ novo módulo
 
 // Screens
 import 'screens/quotes_screen.dart';
@@ -38,8 +42,18 @@ Future<void> main() async {
     debugPrint('❌ Erro ao inicializar Supabase: $e\n$st');
   }
 
+  // ✅ Inicialização do Hive e do CacheManager (na ordem certa)
+  try {
+    await Hive.initFlutter(); // inicializa o Hive
+    await QuotesCacheManager.init(); // abre a box antes do runApp
+    debugPrint('💾 Hive Cache Manager initialized com sucesso');
+  } catch (e) {
+    debugPrint('⚠️ Erro ao inicializar Hive: $e');
+  }
+
   runApp(MyQuotesApp());
 }
+
 
 class MyQuotesApp extends StatefulWidget {
   @override
@@ -58,7 +72,6 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
       const BooksScreen(),            // 3
       const WritersScreen(),          // 4 🆕 nova tela
       const CharactersScreen(),       // 5
-
     ];
 
     return MaterialApp(
@@ -86,9 +99,9 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
               label: 'Quote of the Day',
             ),
             BottomNavigationBarItem(
-                          icon: Icon(Icons.favorite),
-                          label: 'Favorites',
-                        ),
+              icon: Icon(Icons.favorite),
+              label: 'Favorites',
+            ),
             BottomNavigationBarItem(
               icon: Icon(Icons.book),
               label: 'Books',
@@ -101,7 +114,6 @@ class _MyQuotesAppState extends State<MyQuotesApp> {
               icon: Icon(Icons.group),
               label: 'Characters',
             ),
-
           ],
         ),
       ),

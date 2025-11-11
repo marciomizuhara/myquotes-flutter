@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
 import '../utils/quotes_helper.dart';
+import '../utils/quotes_cache_manager.dart'; // ✅ cache global único
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -19,36 +20,96 @@ class _QuotesScreenState extends State<QuotesScreen> {
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
   String _sortMode = 'random'; // modo padrão
+  static const _globalCacheKey = 'quotes_global_cache_v1'; // 🔹 cache único
+  static bool _hasLoadedOnce = false; // ✅ controla se já foi carregado nesta sessão
 
   @override
   void initState() {
     super.initState();
-    _fetchQuotes();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // ⚙️ Só limpa manualmente quando for necessário resetar (comente depois)
+      // await QuotesCacheManager.clearCache(_globalCacheKey);
+      // debugPrint('🧹 Cache global limpo manualmente');
+
+      if (!_hasLoadedOnce) {
+        _fetchQuotes();
+        _hasLoadedOnce = true;
+      } else {
+        debugPrint('🧠 Reuso de cache — não recarregando do Supabase');
+        _fetchQuotes();
+      }
+    });
   }
 
-  Future<void> _fetchQuotes({String? term}) async {
+
+
+  Future<void> _fetchQuotes({String? term, bool forceRefresh = false}) async {
     setState(() => isLoading = true);
-
     QuotesHelper.currentSortMode = _sortMode;
+    final cleanTerm = term?.trim();
+    debugPrint('🔁 Modo atual: $_sortMode | Termo: "$cleanTerm"');
 
-    final data = await QuotesHelper.fetchQuotes(
-      term: term,
-      selectedType: selectedType,
-      sortMode: _sortMode, // ✅ adicionamos aqui
-    );
+    List<Map<String, dynamic>> data = [];
 
-    final normalized = data.map((q) {
-      q['is_favorite'] = (q['is_favorite'] ?? 0) == 1 ? 1 : 0;
-      return q;
-    }).toList();
+    final bool canUseCache =
+        (_sortMode == 'random' && !forceRefresh && (cleanTerm == null || cleanTerm.isEmpty));
 
+    if (canUseCache) {
+      final cached = await QuotesCacheManager.loadQuotes(_globalCacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        debugPrint('💾 Cache (random) carregado (${cached.length} itens)');
+        data = List<Map<String, dynamic>>.from(cached)..shuffle();
+      } else {
+        debugPrint('⚙️ Nenhum cache (random), buscando Supabase...');
+        data = await QuotesHelper.fetchQuotes(
+          term: null,
+          selectedType: selectedType,
+          sortMode: 'random',
+        );
+        await QuotesCacheManager.saveQuotes(_globalCacheKey, data);
+        debugPrint('🧠 Cache inicial criado com ${data.length} citações totais');
+      }
+    } else if (_sortMode == 'one_per_book_asc' || _sortMode == 'one_per_book_desc') {
+      debugPrint('🔄 Modo $_sortMode → Supabase direto (sem cache)');
+      data = await QuotesHelper.fetchQuotes(
+        term: cleanTerm,
+        selectedType: selectedType,
+        sortMode: _sortMode,
+      );
+    } else if (cleanTerm != null && cleanTerm.isNotEmpty) {
+      debugPrint('🔍 Executando busca com operadores (AND/OR habilitados)');
+      data = await QuotesHelper.fetchQuotes(
+        term: cleanTerm,
+        selectedType: selectedType,
+        sortMode: _sortMode,
+      );
+    } else {
+      debugPrint('⚙️ Fallback: modo $_sortMode sem termo');
+      data = await QuotesHelper.fetchQuotes(
+        term: null,
+        selectedType: selectedType,
+        sortMode: _sortMode,
+      );
+    }
+
+    // 🎨 Filtro colorido — aplicado localmente SEM refazer fetch
+    if (selectedType != null) {
+      final before = data.length;
+      data = data.where((q) => q['type'] == selectedType).toList();
+      debugPrint('🎨 Filtro de tipo aplicado localmente → ${data.length}/$before mantidas');
+    }
+
+    // 🔹 Atualiza interface
     setState(() {
-      quotes = normalized;
+      quotes = data;
       isLoading = false;
     });
   }
 
-  void _changeSortMode(String mode) {
+
+
+  void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
     _fetchQuotes(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
   }
@@ -73,7 +134,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
   Widget _typeDot(int t, Color fill) {
     final bool active = selectedType == t;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         setState(() {
           selectedType = active ? null : t;
         });
@@ -117,12 +178,12 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 controller: searchCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Pesquisar citações...',
+                  hintText: 'Pesquisar citações (use AND / OR)...',
                   hintStyle: const TextStyle(color: Colors.white54),
                   prefixIcon: const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, color: Colors.white70),
-                    onPressed: () {
+                    onPressed: () async {
                       searchCtrl.clear();
                       selectedType = null;
                       FocusScope.of(context).unfocus();
@@ -135,10 +196,8 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 0,
-                    horizontal: 16,
-                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                 ),
                 onSubmitted: (term) => _fetchQuotes(term: term),
               ),
@@ -165,7 +224,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     onPressed: () => _changeSortMode('random'),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.arrow_upward, color: Colors.white70),
+                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
                     tooltip: 'Oldest',
                     onPressed: () => _changeSortMode('one_per_book_asc'),
                   ),
@@ -177,9 +236,10 @@ class _QuotesScreenState extends State<QuotesScreen> {
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
-                      onRefresh: () => _fetchQuotes(
-                        term: searchCtrl.text.isEmpty ? null : searchCtrl.text,
-                      ),
+                      onRefresh: () async {
+                        await QuotesCacheManager.clearCache(_globalCacheKey);
+                        await _fetchQuotes(forceRefresh: true);
+                      },
                       child: ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: quotes.length,
@@ -189,11 +249,13 @@ class _QuotesScreenState extends State<QuotesScreen> {
                             onDoubleTap: () => _copyQuote(q),
                             child: QuoteCard(
                               quote: q,
-                              onFavoriteChanged: () {
+                              onFavoriteChanged: () async {
                                 setState(() {
                                   quotes[i]['is_favorite'] =
                                       quotes[i]['is_favorite'] == 1 ? 0 : 1;
                                 });
+                                await QuotesCacheManager.saveQuotes(
+                                    _globalCacheKey, quotes);
                               },
                             ),
                           );

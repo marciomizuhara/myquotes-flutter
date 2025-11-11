@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
+import '../utils/quotes_cache_manager.dart';
 
 class FavoriteQuotesScreen extends StatefulWidget {
   const FavoriteQuotesScreen({Key? key}) : super(key: key);
@@ -27,33 +28,114 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
 
   Future<void> _fetchFavorites({String? term}) async {
     setState(() => isLoading = true);
+    const cacheKey = 'favorites_cache_v1';
 
     try {
-      final query = supabase
-          .from('quotes')
-          .select(
-            'id, text, page, type, notes, is_favorite::int, book_id, books(title, author, cover)',
-          )
-          .eq('is_favorite', 1);
+      List<Map<String, dynamic>> data = [];
 
-      if (term != null && term.trim().isNotEmpty) {
-        query.ilike('text', '%${term.trim()}%');
+      // ✅ 1. Cache — só se não houver termo de busca
+      if (term == null || term.trim().isEmpty) {
+        final cached = await QuotesCacheManager.loadQuotes(cacheKey);
+        if (cached != null && cached.isNotEmpty) {
+          debugPrint('💾 Cache de favoritos carregado (${cached.length})');
+          data = List<Map<String, dynamic>>.from(cached)..shuffle();
+        }
       }
 
-      if (selectedType != null) {
-        query.eq('type', selectedType!);
+      // ✅ 2. Busca com termo (com suporte a AND / OR)
+      if (data.isEmpty && term != null && term.trim().isNotEmpty) {
+        final rawTerm = term.trim();
+        final Map<int, Map<String, dynamic>> allResults = {};
+
+        if (rawTerm.contains(' OR ') || rawTerm.contains(' AND ')) {
+          final orParts = rawTerm.split(' OR ');
+
+          for (var orSegment in orParts) {
+            final andParts = orSegment.split(' AND ');
+            List<Map<String, dynamic>>? andResult;
+
+            for (var raw in andParts) {
+              final clean = raw.replaceAll('"', '').trim();
+              if (clean.isEmpty) continue;
+
+              final res = await supabase.rpc('search_quotes', params: {'search_term': clean});
+              final current = (res as List)
+                  .map<Map<String, dynamic>>((e) {
+                    final q = Map<String, dynamic>.from(e);
+                    q['books'] = {
+                      'title': q['book_title'] ?? '',
+                      'author': q['book_author'] ?? '',
+                      'cover': q['book_cover'] ?? '',
+                    };
+                    return q;
+                  })
+                  .toList();
+
+              if (andResult == null) {
+                andResult = current;
+              } else {
+                final ids = andResult.map((q) => q['id']).toSet();
+                andResult = current.where((q) => ids.contains(q['id'])).toList();
+              }
+            }
+
+            if (andResult != null) {
+              for (final q in andResult) {
+                final id = int.tryParse(q['id'].toString()) ?? 0;
+                if (id > 0) allResults[id] = q;
+              }
+            }
+          }
+
+          data = allResults.values.toList();
+          debugPrint('🔍 Busca combinada OR/AND → ${data.length} resultados totais');
+        } else {
+          final res = await supabase.rpc('search_quotes', params: {'search_term': rawTerm});
+          data = (res as List)
+              .map<Map<String, dynamic>>((e) {
+                final q = Map<String, dynamic>.from(e);
+                q['books'] = {
+                  'title': q['book_title'] ?? '',
+                  'author': q['book_author'] ?? '',
+                  'cover': q['book_cover'] ?? '',
+                };
+                return q;
+              })
+              .toList();
+        }
+
+        // 🔹 Filtra apenas favoritas
+        data = data
+            .where((q) =>
+                q['is_favorite'] == 1 ||
+                q['is_favorite'] == true ||
+                q['is_favorite'] == '1' ||
+                (q['is_favorite'] is String &&
+                    q['is_favorite'].toLowerCase() == 'true'))
+            .toList();
+
+        debugPrint('💛 FetchFavorites (RPC) → ${data.length} favoritas encontradas');
       }
 
-      query.order('id', ascending: true);
+      // ✅ 3. Busca direta no Supabase (sem termo, fallback)
+      if (data.isEmpty && (term == null || term.trim().isEmpty)) {
+        final query = supabase
+            .from('quotes')
+            .select(
+              'id, text, page, type, notes, is_favorite::int, book_id, books(title, author, cover)',
+            )
+            .eq('is_favorite', 1)
+            .order('id', ascending: true);
 
-      final res = await query;
-      final data = (res as List)
-          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-          .toList();
+        final res = await query;
+        data = (res as List)
+            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
+            .toList();
 
-      debugPrint('💛 FetchFavorites → ${data.length} favoritas recebidas');
+        debugPrint('💛 FetchFavorites (Supabase direto) → ${data.length}');
+      }
 
-      // 🔹 Ordenação local
+      // ✅ 4. Ordenação local
       if (_sortMode == 'newest') {
         data.sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
       } else if (_sortMode == 'oldest') {
@@ -62,10 +144,20 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
         data.shuffle();
       }
 
-      for (var q in data.take(5)) {
-        debugPrint('💛 id=${q['id']} | type=${q['type']} | fav=${q['is_favorite']}');
+      // 🎨 5. Aplica filtro colorido (tipo) localmente
+      if (selectedType != null) {
+        final before = data.length;
+        data = data.where((q) => q['type'] == selectedType).toList();
+        debugPrint('🎨 Filtro de tipo aplicado localmente → ${data.length}/$before mantidas');
       }
 
+      // ✅ 6. Atualiza cache (somente se sem termo)
+      if ((term == null || term.trim().isEmpty) && data.isNotEmpty) {
+        await QuotesCacheManager.saveQuotes(cacheKey, data);
+        debugPrint('📦 Cache de favoritos salvo (${data.length})');
+      }
+
+      // ✅ 7. Atualiza UI
       setState(() {
         quotes = data;
         isLoading = false;
