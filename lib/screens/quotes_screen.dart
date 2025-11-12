@@ -214,14 +214,22 @@ class _QuotesScreenState extends State<QuotesScreen> {
                   _typeDot(6, gray),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.arrow_upward, color: Colors.white70),
-                    tooltip: 'Newest',
-                    onPressed: () => _changeSortMode('one_per_book_desc'),
+                    icon: const Icon(Icons.refresh, color: Colors.white70),
+                    tooltip: 'Recarregar do Supabase',
+                    onPressed: () async {
+                      await QuotesCacheManager.clearCache(_globalCacheKey);
+                      await _fetchQuotes(forceRefresh: true);
+                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.shuffle, color: Colors.white70),
                     tooltip: 'Shuffle',
                     onPressed: () => _changeSortMode('random'),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_upward, color: Colors.white70),
+                    tooltip: 'Newest',
+                    onPressed: () => _changeSortMode('one_per_book_desc'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_downward, color: Colors.white70),

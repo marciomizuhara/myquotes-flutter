@@ -19,158 +19,152 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
   String _sortMode = 'random';
+  static const _favoritesCacheKey = 'favorites_cache_v1';
+  static bool _hasLoadedOnce = false; // 🔹 evita sobrescrever cache
 
   @override
   void initState() {
     super.initState();
-    _fetchFavorites();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!_hasLoadedOnce) {
+        await _fetchFavorites();
+        _hasLoadedOnce = true;
+      } else {
+        debugPrint('💛 Reuso de cache — não recarregando do Supabase');
+        await _fetchFavorites();
+      }
+    });
   }
 
-  Future<void> _fetchFavorites({String? term}) async {
+  Future<void> _fetchFavorites({String? term, bool forceRefresh = false}) async {
     setState(() => isLoading = true);
-    const cacheKey = 'favorites_cache_v1';
+    final cleanTerm = term?.trim();
+    debugPrint('💛 Modo atual: $_sortMode | Termo: "$cleanTerm"');
 
-    try {
-      List<Map<String, dynamic>> data = [];
+    List<Map<String, dynamic>> data = [];
+    bool fetchedFromSupabase = false;
 
-      // ✅ 1. Cache — só se não houver termo de busca
-      if (term == null || term.trim().isEmpty) {
-        final cached = await QuotesCacheManager.loadQuotes(cacheKey);
-        if (cached != null && cached.isNotEmpty) {
-          debugPrint('💾 Cache de favoritos carregado (${cached.length})');
-          data = List<Map<String, dynamic>>.from(cached)..shuffle();
-        }
+    // ✅ 1. Usa cache existente se possível
+    final bool canUseCache =
+        (_sortMode == 'random' && !forceRefresh && (cleanTerm == null || cleanTerm.isEmpty));
+
+    if (canUseCache) {
+      final cached = await QuotesCacheManager.loadQuotes(_favoritesCacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        debugPrint('💾 Cache (favoritos) carregado (${cached.length} itens)');
+        data = List<Map<String, dynamic>>.from(cached)..shuffle();
+      } else {
+        debugPrint('⚙️ Nenhum cache de favoritos, buscando do Supabase...');
+        data = await _fetchFromSupabase();
+        fetchedFromSupabase = true;
       }
-
-      // ✅ 2. Busca com termo (com suporte a AND / OR)
-      if (data.isEmpty && term != null && term.trim().isNotEmpty) {
-        final rawTerm = term.trim();
-        final Map<int, Map<String, dynamic>> allResults = {};
-
-        if (rawTerm.contains(' OR ') || rawTerm.contains(' AND ')) {
-          final orParts = rawTerm.split(' OR ');
-
-          for (var orSegment in orParts) {
-            final andParts = orSegment.split(' AND ');
-            List<Map<String, dynamic>>? andResult;
-
-            for (var raw in andParts) {
-              final clean = raw.replaceAll('"', '').trim();
-              if (clean.isEmpty) continue;
-
-              final res = await supabase.rpc('search_quotes', params: {'search_term': clean});
-              final current = (res as List)
-                  .map<Map<String, dynamic>>((e) {
-                    final q = Map<String, dynamic>.from(e);
-                    q['books'] = {
-                      'title': q['book_title'] ?? '',
-                      'author': q['book_author'] ?? '',
-                      'cover': q['book_cover'] ?? '',
-                    };
-                    return q;
-                  })
-                  .toList();
-
-              if (andResult == null) {
-                andResult = current;
-              } else {
-                final ids = andResult.map((q) => q['id']).toSet();
-                andResult = current.where((q) => ids.contains(q['id'])).toList();
-              }
-            }
-
-            if (andResult != null) {
-              for (final q in andResult) {
-                final id = int.tryParse(q['id'].toString()) ?? 0;
-                if (id > 0) allResults[id] = q;
-              }
-            }
-          }
-
-          data = allResults.values.toList();
-          debugPrint('🔍 Busca combinada OR/AND → ${data.length} resultados totais');
-        } else {
-          final res = await supabase.rpc('search_quotes', params: {'search_term': rawTerm});
-          data = (res as List)
-              .map<Map<String, dynamic>>((e) {
-                final q = Map<String, dynamic>.from(e);
-                q['books'] = {
-                  'title': q['book_title'] ?? '',
-                  'author': q['book_author'] ?? '',
-                  'cover': q['book_cover'] ?? '',
-                };
-                return q;
-              })
-              .toList();
-        }
-
-        // 🔹 Filtra apenas favoritas
-        data = data
-            .where((q) =>
-                q['is_favorite'] == 1 ||
-                q['is_favorite'] == true ||
-                q['is_favorite'] == '1' ||
-                (q['is_favorite'] is String &&
-                    q['is_favorite'].toLowerCase() == 'true'))
-            .toList();
-
-        debugPrint('💛 FetchFavorites (RPC) → ${data.length} favoritas encontradas');
-      }
-
-      // ✅ 3. Busca direta no Supabase (sem termo, fallback)
-      if (data.isEmpty && (term == null || term.trim().isEmpty)) {
-        final query = supabase
-            .from('quotes')
-            .select(
-              'id, text, page, type, notes, is_favorite::int, book_id, books(title, author, cover)',
-            )
-            .eq('is_favorite', 1)
-            .order('id', ascending: true);
-
-        final res = await query;
-        data = (res as List)
-            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-            .toList();
-
-        debugPrint('💛 FetchFavorites (Supabase direto) → ${data.length}');
-      }
-
-      // ✅ 4. Ordenação local
-      if (_sortMode == 'newest') {
-        data.sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
-      } else if (_sortMode == 'oldest') {
-        data.sort((a, b) => (a['id'] as int).compareTo(b['id'] as int));
-      } else if (_sortMode == 'random') {
-        data.shuffle();
-      }
-
-      // 🎨 5. Aplica filtro colorido (tipo) localmente
-      if (selectedType != null) {
-        final before = data.length;
-        data = data.where((q) => q['type'] == selectedType).toList();
-        debugPrint('🎨 Filtro de tipo aplicado localmente → ${data.length}/$before mantidas');
-      }
-
-      // ✅ 6. Atualiza cache (somente se sem termo)
-      if ((term == null || term.trim().isEmpty) && data.isNotEmpty) {
-        await QuotesCacheManager.saveQuotes(cacheKey, data);
-        debugPrint('📦 Cache de favoritos salvo (${data.length})');
-      }
-
-      // ✅ 7. Atualiza UI
-      setState(() {
-        quotes = data;
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ Erro em _fetchFavorites: $e');
-      setState(() => isLoading = false);
+    } else if (cleanTerm != null && cleanTerm.isNotEmpty) {
+      debugPrint('🔍 Busca com operadores AND/OR ativa');
+      data = await _fetchSearchFavorites(cleanTerm);
+    } else {
+      debugPrint('⚙️ Fallback: carregando todos os favoritos do Supabase');
+      data = await _fetchFromSupabase();
+      fetchedFromSupabase = true;
     }
+
+    // 🎨 Filtro colorido local
+    if (selectedType != null) {
+      final before = data.length;
+      data = data.where((q) {
+        final t = q['type'];
+        final intType = int.tryParse(t?.toString() ?? '');
+        return intType == selectedType;
+      }).toList();
+      debugPrint('🎨 Filtro de tipo aplicado → ${data.length}/$before mantidas');
+    }
+
+    // ✅ 2. Salva cache só se veio do Supabase
+    if (fetchedFromSupabase && data.isNotEmpty) {
+      await QuotesCacheManager.saveQuotes(_favoritesCacheKey, data);
+      debugPrint('📦 Cache atualizado (${data.length} favoritos totais)');
+    }
+
+    setState(() {
+      quotes = data;
+      isLoading = false;
+    });
   }
 
-  void _changeSortMode(String mode) {
+  Future<List<Map<String, dynamic>>> _fetchFromSupabase() async {
+    final res = await supabase
+        .from('quotes')
+        .select(
+          'id, text, page, type, notes, is_favorite::int, book_id, books(title, author, cover)',
+        )
+        .eq('is_favorite', 1)
+        .order('id', ascending: true)
+        .limit(2000); // 🔹 força retorno amplo
+
+    final data =
+        (res as List).map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e)).toList();
+
+    debugPrint('💛 FetchFromSupabase retornou ${data.length} favoritos');
+    return data;
+  }
+
+
+  Future<List<Map<String, dynamic>>> _fetchSearchFavorites(String term) async {
+    final Map<int, Map<String, dynamic>> allResults = {};
+    final orParts = term.split(' OR ');
+
+    for (var orSegment in orParts) {
+      final andParts = orSegment.split(' AND ');
+      List<Map<String, dynamic>>? andResult;
+
+      for (var raw in andParts) {
+        final clean = raw.replaceAll('"', '').trim();
+        if (clean.isEmpty) continue;
+
+        final res = await supabase.rpc('search_quotes', params: {'search_term': clean});
+        final current = (res as List)
+            .map<Map<String, dynamic>>((e) {
+              final q = Map<String, dynamic>.from(e);
+              q['books'] = {
+                'title': q['book_title'] ?? '',
+                'author': q['book_author'] ?? '',
+                'cover': q['book_cover'] ?? '',
+              };
+              return q;
+            })
+            .toList();
+
+        if (andResult == null) {
+          andResult = current;
+        } else {
+          final ids = andResult.map((q) => q['id']).toSet();
+          andResult = current.where((q) => ids.contains(q['id'])).toList();
+        }
+      }
+
+      if (andResult != null) {
+        for (final q in andResult) {
+          final id = int.tryParse(q['id'].toString()) ?? 0;
+          if (id > 0) allResults[id] = q;
+        }
+      }
+    }
+
+    final results = allResults.values
+        .where((q) =>
+            q['is_favorite'] == 1 ||
+            q['is_favorite'] == true ||
+            q['is_favorite'] == '1' ||
+            (q['is_favorite'] is String && q['is_favorite'].toLowerCase() == 'true'))
+        .toList();
+
+    debugPrint('💛 FetchFavorites (RPC) → ${results.length} favoritas encontradas');
+    return results;
+  }
+
+  void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
-    _fetchFavorites(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
+    await _fetchFavorites(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
   }
 
   void _copyQuote(Map<String, dynamic> q) {
@@ -193,11 +187,11 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
   Widget _typeDot(int t, Color fill) {
     final bool active = selectedType == t;
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         setState(() {
           selectedType = active ? null : t;
         });
-        _fetchFavorites(term: searchCtrl.text);
+        await _fetchFavorites(term: searchCtrl.text);
       },
       child: Container(
         width: 22,
@@ -242,11 +236,11 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                   prefixIcon: const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, color: Colors.white70),
-                    onPressed: () {
+                    onPressed: () async {
                       searchCtrl.clear();
                       selectedType = null;
                       FocusScope.of(context).unfocus();
-                      _fetchFavorites();
+                      await _fetchFavorites();
                     },
                   ),
                   filled: true,
@@ -273,9 +267,12 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                   _typeDot(6, gray),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
-                    tooltip: 'Mais antigas',
-                    onPressed: () => _changeSortMode('oldest'),
+                    icon: const Icon(Icons.refresh, color: Colors.white70),
+                    tooltip: 'Recarregar do Supabase',
+                    onPressed: () async {
+                      await QuotesCacheManager.clearCache(_favoritesCacheKey);
+                      await _fetchFavorites(forceRefresh: true);
+                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.shuffle, color: Colors.white70),
@@ -287,6 +284,11 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                     tooltip: 'Mais recentes',
                     onPressed: () => _changeSortMode('newest'),
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
+                    tooltip: 'Mais antigas',
+                    onPressed: () => _changeSortMode('oldest'),
+                  ),
                 ],
               ),
             ),
@@ -294,40 +296,33 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : quotes.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Nenhuma citação marcada como favorita.',
-                            style: TextStyle(color: Colors.white54),
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () => _fetchFavorites(
-                            term: searchCtrl.text.isEmpty
-                                ? null
-                                : searchCtrl.text,
-                          ),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(12),
-                            itemCount: quotes.length,
-                            itemBuilder: (context, i) {
-                              final q = quotes[i];
-                              return GestureDetector(
-                                onDoubleTap: () => _copyQuote(q),
-                                child: QuoteCard(
-                                  quote: q,
-                                  onFavoriteChanged: () async {
-                                    if ((quotes[i]['is_favorite'] ?? 0) == 0) {
-                                      setState(() => quotes.removeAt(i));
-                                    } else {
-                                      setState(() {});
-                                    }
-                                  },
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                  : RefreshIndicator(
+                      onRefresh: () async {
+                        await QuotesCacheManager.clearCache(_favoritesCacheKey);
+                        await _fetchFavorites(forceRefresh: true);
+                      },
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: quotes.length,
+                        itemBuilder: (context, i) {
+                          final q = quotes[i];
+                          return GestureDetector(
+                            onDoubleTap: () => _copyQuote(q),
+                            child: QuoteCard(
+                              quote: q,
+                              onFavoriteChanged: () async {
+                                setState(() {
+                                  quotes[i]['is_favorite'] =
+                                      quotes[i]['is_favorite'] == 1 ? 0 : 1;
+                                });
+                                await QuotesCacheManager.saveQuotes(
+                                    _favoritesCacheKey, quotes);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),
