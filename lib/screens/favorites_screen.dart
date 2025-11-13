@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
+import '../widgets/type_selector.dart'; // ✅ seletor modularizado
 import '../utils/quotes_cache_manager.dart';
 
 class FavoriteQuotesScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!_hasLoadedOnce) {
         await _fetchFavorites();
@@ -107,7 +107,6 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     debugPrint('💛 FetchFromSupabase retornou ${data.length} favoritos');
     return data;
   }
-
 
   Future<List<Map<String, dynamic>>> _fetchSearchFavorites(String term) async {
     final Map<int, Map<String, dynamic>> allResults = {};
@@ -231,7 +230,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                 controller: searchCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Pesquisar citações favoritas...',
+                  hintText: '',
                   hintStyle: const TextStyle(color: Colors.white54),
                   prefixIcon: const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
@@ -284,11 +283,6 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                     tooltip: 'Mais recentes',
                     onPressed: () => _changeSortMode('newest'),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
-                    tooltip: 'Mais antigas',
-                    onPressed: () => _changeSortMode('oldest'),
-                  ),
                 ],
               ),
             ),
@@ -306,19 +300,16 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                         itemCount: quotes.length,
                         itemBuilder: (context, i) {
                           final q = quotes[i];
-                          return GestureDetector(
-                            onDoubleTap: () => _copyQuote(q),
-                            child: QuoteCard(
-                              quote: q,
-                              onFavoriteChanged: () async {
-                                setState(() {
-                                  quotes[i]['is_favorite'] =
-                                      quotes[i]['is_favorite'] == 1 ? 0 : 1;
-                                });
-                                await QuotesCacheManager.saveQuotes(
-                                    _favoritesCacheKey, quotes);
-                              },
-                            ),
+                          return QuoteCard(
+                            quote: q,
+                            onFavoriteChanged: () async {
+                              setState(() {
+                                quotes[i]['is_favorite'] =
+                                    quotes[i]['is_favorite'] == 1 ? 0 : 1;
+                              });
+                              await QuotesCacheManager.saveQuotes(
+                                  _favoritesCacheKey, quotes);
+                            },
                           );
                         },
                       ),

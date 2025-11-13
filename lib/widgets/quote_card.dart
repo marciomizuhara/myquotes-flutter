@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../utils/colors.dart';
+import '../widgets/type_selector.dart';
 
 class QuoteCard extends StatefulWidget {
   final Map<String, dynamic> quote;
@@ -29,17 +30,15 @@ class _QuoteCardState extends State<QuoteCard> {
     final raw = widget.quote['is_favorite'];
     _isFavorite = raw == 1 || raw == true || raw == '1';
 
-    debugPrint('❤️ initState → id=${widget.quote['id']} is_favorite=$raw (_isFavorite=$_isFavorite)');
+    debugPrint(
+        '❤️ initState → id=${widget.quote['id']} is_favorite=$raw (_isFavorite=$_isFavorite)');
   }
 
   Future<void> _updateNotes(String newText) async {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      await supabase
-          .from('quotes')
-          .update({'notes': newText})
-          .eq('id', widget.quote['id']);
+      await supabase.from('quotes').update({'notes': newText}).eq('id', widget.quote['id']);
     } catch (e) {
       debugPrint('Erro ao atualizar nota: $e');
     } finally {
@@ -49,16 +48,12 @@ class _QuoteCardState extends State<QuoteCard> {
 
   Future<void> _toggleFavorite() async {
     try {
-      debugPrint('❤️ Toggle iniciado para ID ${widget.quote['id']} | valor atual=$_isFavorite');
-
       final newValue = _isFavorite ? 0 : 1;
 
       setState(() {
         _isFavorite = !_isFavorite;
         widget.quote['is_favorite'] = newValue;
       });
-
-      debugPrint('🟢 Após setState → _isFavorite=$_isFavorite | widget.quote=${widget.quote['is_favorite']}');
 
       final updated = await supabase
           .from('quotes')
@@ -67,82 +62,10 @@ class _QuoteCardState extends State<QuoteCard> {
           .select('is_favorite')
           .maybeSingle();
 
-      debugPrint('💾 Supabase retorno → id=${widget.quote['id']} valor=${updated?['is_favorite']} (${updated?['is_favorite']?.runtimeType})');
-
       widget.onFavoriteChanged?.call();
+
     } catch (e) {
       debugPrint('❌ Erro ao atualizar favorito: $e');
-    }
-  }
-
-  Future<void> _showTypeSelector(BuildContext context, int currentType) async {
-    final colors = {
-      1: const Color(0xFF9B2C2C),
-      2: const Color(0xFFB8961A),
-      3: const Color(0xFF2F7D32),
-      4: const Color(0xFF275D8C),
-      5: const Color(0xFF118EA8),
-      6: const Color(0xFF5A5A5A),
-    };
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1A1A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: colors.entries.map((entry) {
-              final isActive = entry.key == currentType;
-              return GestureDetector(
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _updateQuoteType(entry.key);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: isActive ? 28 : 22,
-                  height: isActive ? 28 : 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: entry.value,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: entry.value.withOpacity(0.8),
-                              blurRadius: 8,
-                              spreadRadius: 2,
-                            )
-                          ]
-                        : [],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _updateQuoteType(int newType) async {
-    try {
-      await supabase
-          .from('quotes')
-          .update({'type': newType})
-          .eq('id', widget.quote['id']);
-
-      setState(() {
-        widget.quote['type'] = newType;
-      });
-
-      debugPrint('🟢 Tipo da quote atualizado para $newType');
-    } catch (e) {
-      debugPrint('❌ Erro ao atualizar tipo: $e');
     }
   }
 
@@ -173,12 +96,20 @@ class _QuoteCardState extends State<QuoteCard> {
   @override
   Widget build(BuildContext context) {
     final q = widget.quote;
+
     final Map<String, dynamic> book =
         (q['books'] is Map<String, dynamic>) ? q['books'] as Map<String, dynamic> : {};
     final String cover = (book['cover'] ?? '').toString();
 
     final color = colorByType(_safeType(q['type']));
     final note = _notesCtrl.text.trim();
+
+    // 🔹 Tratar página
+    final String pageText = (q['page'] == null ||
+            q['page'].toString().trim().isEmpty ||
+            q['page'].toString() == 'null')
+        ? '--'
+        : q['page'].toString();
 
     return GestureDetector(
       onDoubleTap: () => _copyQuote(q),
@@ -221,6 +152,8 @@ class _QuoteCardState extends State<QuoteCard> {
                           ),
                         ),
                         const SizedBox(height: 4),
+
+                        // 🔹 Título / autor / página
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -247,21 +180,30 @@ class _QuoteCardState extends State<QuoteCard> {
                                 ],
                               ),
                             ),
-                            if (q['page'] != null)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4, bottom: 1),
-                                child: GestureDetector(
-                                  onTap: () => _showTypeSelector(context, _safeType(q['type'])),
-                                  child: Text(
-                                    'p. ${q['page']}',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontStyle: FontStyle.italic,
-                                      fontSize: 9.5,
-                                    ),
+
+                            // 🔹 Página substituída
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4, bottom: 1),
+                              child: GestureDetector(
+                                onTap: () => TypeSelector.show(
+                                  context,
+                                  currentType: _safeType(q['type']),
+                                  quoteId: q['id'],
+                                  onTypeChanged: (newType) {
+                                    setState(() => widget.quote['type'] = newType);
+                                  },
+                                ),
+                                child: Text(
+                                  'p. $pageText',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.normal,
+                                    decoration: TextDecoration.none,
                                   ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ],
@@ -269,11 +211,10 @@ class _QuoteCardState extends State<QuoteCard> {
                   ),
                 ],
               ),
+
               Padding(
                 padding: const EdgeInsets.only(top: 2, left: 0, bottom: 0),
-                child: _editing
-                    ? _buildEditRow(note)
-                    : _buildNormalRow(note),
+                child: _editing ? _buildEditRow(note) : _buildNormalRow(note),
               ),
             ],
           ),
@@ -315,7 +256,6 @@ class _QuoteCardState extends State<QuoteCard> {
           constraints: const BoxConstraints(),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.check, color: Colors.green, size: 17),
-          tooltip: 'Salvar nota',
           onPressed: () async {
             final newText = _notesCtrl.text.trim();
             await _updateNotes(newText);
@@ -327,7 +267,6 @@ class _QuoteCardState extends State<QuoteCard> {
           constraints: const BoxConstraints(),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.close, color: Colors.redAccent, size: 17),
-          tooltip: 'Cancelar edição',
           onPressed: () {
             setState(() {
               _notesCtrl.text = note;
@@ -348,7 +287,6 @@ class _QuoteCardState extends State<QuoteCard> {
           constraints: const BoxConstraints(),
           visualDensity: VisualDensity.compact,
           icon: const Icon(Icons.edit_note, color: Colors.white70, size: 17),
-          tooltip: 'Editar nota',
           onPressed: () => setState(() => _editing = true),
         ),
         Expanded(
@@ -374,9 +312,6 @@ class _QuoteCardState extends State<QuoteCard> {
               color: _isFavorite ? Colors.redAccent : Colors.white38,
               size: 17,
             ),
-            tooltip: _isFavorite
-                ? 'Remover dos favoritos'
-                : 'Adicionar aos favoritos',
             onPressed: _toggleFavorite,
           ),
         ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/colors.dart';
 import '../utils/quotes_helper.dart';
+import '../widgets/type_selector.dart';
 
 class QuoteOfTheDayScreen extends StatefulWidget {
   const QuoteOfTheDayScreen({Key? key}) : super(key: key);
@@ -334,21 +335,36 @@ class _QuoteOfTheDayScreenState extends State<QuoteOfTheDayScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         if (q['page'] != null)
-                          Text(
-                            'p. ${q['page']}',
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 15,
-                              fontStyle: FontStyle.italic,
+                          GestureDetector(
+                            onTap: () async {
+                              final int type =
+                                  (q['type'] is int) ? q['type'] : int.tryParse(q['type'].toString()) ?? 0;
+
+                              await TypeSelector.show(
+                                context,
+                                currentType: type,
+                                quoteId: q['id'],
+                                onTypeChanged: (newType) async {
+                                  await _updateQuoteType(newType);
+                                  setState(() => _quote?['type'] = newType);
+                                },
+                              );
+                            },
+                            child: Text(
+                              'p. ${q['page']}',
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           )
                         else
                           const SizedBox(width: 24),
+
                         IconButton(
                           icon: Icon(
-                            (q['is_favorite'] == 1)
-                                ? Icons.favorite
-                                : Icons.favorite_border,
+                            (q['is_favorite'] == 1) ? Icons.favorite : Icons.favorite_border,
                             color: (q['is_favorite'] == 1)
                                 ? Colors.redAccent
                                 : Colors.white54,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
+import '../widgets/type_selector.dart'; // ✅ seletor modularizado
 import '../utils/quotes_helper.dart';
 import '../utils/quotes_cache_manager.dart'; // ✅ cache global único
 
@@ -26,12 +27,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // ⚙️ Só limpa manualmente quando for necessário resetar (comente depois)
-      // await QuotesCacheManager.clearCache(_globalCacheKey);
-      // debugPrint('🧹 Cache global limpo manualmente');
-
       if (!_hasLoadedOnce) {
         _fetchQuotes();
         _hasLoadedOnce = true;
@@ -41,8 +37,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
       }
     });
   }
-
-
 
   Future<void> _fetchQuotes({String? term, bool forceRefresh = false}) async {
     setState(() => isLoading = true);
@@ -100,14 +94,11 @@ class _QuotesScreenState extends State<QuotesScreen> {
       debugPrint('🎨 Filtro de tipo aplicado localmente → ${data.length}/$before mantidas');
     }
 
-    // 🔹 Atualiza interface
     setState(() {
       quotes = data;
       isLoading = false;
     });
   }
-
-
 
   void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
@@ -178,7 +169,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 controller: searchCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Pesquisar citações (use AND / OR)...',
+                  hintText: '',
                   hintStyle: const TextStyle(color: Colors.white54),
                   prefixIcon: const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
@@ -231,11 +222,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     tooltip: 'Newest',
                     onPressed: () => _changeSortMode('one_per_book_desc'),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_downward, color: Colors.white70),
-                    tooltip: 'Oldest',
-                    onPressed: () => _changeSortMode('one_per_book_asc'),
-                  ),
                 ],
               ),
             ),
@@ -253,19 +239,16 @@ class _QuotesScreenState extends State<QuotesScreen> {
                         itemCount: quotes.length,
                         itemBuilder: (context, i) {
                           final q = quotes[i];
-                          return GestureDetector(
-                            onDoubleTap: () => _copyQuote(q),
-                            child: QuoteCard(
-                              quote: q,
-                              onFavoriteChanged: () async {
-                                setState(() {
-                                  quotes[i]['is_favorite'] =
-                                      quotes[i]['is_favorite'] == 1 ? 0 : 1;
-                                });
-                                await QuotesCacheManager.saveQuotes(
-                                    _globalCacheKey, quotes);
-                              },
-                            ),
+                          return QuoteCard(
+                            quote: q,
+                            onFavoriteChanged: () async {
+                              setState(() {
+                                quotes[i]['is_favorite'] =
+                                    quotes[i]['is_favorite'] == 1 ? 0 : 1;
+                              });
+                              await QuotesCacheManager.saveQuotes(
+                                  _globalCacheKey, quotes);
+                            },
                           );
                         },
                       ),
