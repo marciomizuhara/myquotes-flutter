@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
-import '../widgets/type_selector.dart'; // ✅ seletor modularizado
-import '../utils/quotes_helper.dart';
-import '../utils/quotes_cache_manager.dart'; // ✅ cache global único
+import '../widgets/type_selector.dart';
+import '../utils/quotes_search_manager.dart';     //  ✅ NOVO
+import '../utils/quotes_cache_manager.dart';
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -14,95 +14,43 @@ class QuotesScreen extends StatefulWidget {
 }
 
 class _QuotesScreenState extends State<QuotesScreen> {
-  final supabase = Supabase.instance.client;
   final searchCtrl = TextEditingController();
-
   bool isLoading = true;
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
-  String _sortMode = 'random'; // modo padrão
-  static const _globalCacheKey = 'quotes_global_cache_v1'; // 🔹 cache único
-  static bool _hasLoadedOnce = false; // ✅ controla se já foi carregado nesta sessão
+
+  String _sortMode = 'random';
+  static const _globalCacheKey = 'quotes_global_cache_v1';
+  static bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!_hasLoadedOnce) {
-        _fetchQuotes();
-        _hasLoadedOnce = true;
-      } else {
-        debugPrint('🧠 Reuso de cache — não recarregando do Supabase');
-        _fetchQuotes();
-      }
+      await _runSearch();
+      _hasLoadedOnce = true;
     });
   }
 
-  Future<void> _fetchQuotes({String? term, bool forceRefresh = false}) async {
+  Future<void> _runSearch({bool forceRefresh = false}) async {
     setState(() => isLoading = true);
-    QuotesHelper.currentSortMode = _sortMode;
-    final cleanTerm = term?.trim();
-    debugPrint('🔁 Modo atual: $_sortMode | Termo: "$cleanTerm"');
 
-    List<Map<String, dynamic>> data = [];
+    quotes = await QuotesSearchManager.search(
+      origin: 'global',
+      rawTerm: searchCtrl.text,
+      typeFilter: selectedType,
+      sortMode: _sortMode,
+      cacheKey: _globalCacheKey,
+      forceRefresh: forceRefresh,
+    );
 
-    final bool canUseCache =
-        (_sortMode == 'random' && !forceRefresh && (cleanTerm == null || cleanTerm.isEmpty));
-
-    if (canUseCache) {
-      final cached = await QuotesCacheManager.loadQuotes(_globalCacheKey);
-      if (cached != null && cached.isNotEmpty) {
-        debugPrint('💾 Cache (random) carregado (${cached.length} itens)');
-        data = List<Map<String, dynamic>>.from(cached)..shuffle();
-      } else {
-        debugPrint('⚙️ Nenhum cache (random), buscando Supabase...');
-        data = await QuotesHelper.fetchQuotes(
-          term: null,
-          selectedType: selectedType,
-          sortMode: 'random',
-        );
-        await QuotesCacheManager.saveQuotes(_globalCacheKey, data);
-        debugPrint('🧠 Cache inicial criado com ${data.length} citações totais');
-      }
-    } else if (_sortMode == 'one_per_book_asc' || _sortMode == 'one_per_book_desc') {
-      debugPrint('🔄 Modo $_sortMode → Supabase direto (sem cache)');
-      data = await QuotesHelper.fetchQuotes(
-        term: cleanTerm,
-        selectedType: selectedType,
-        sortMode: _sortMode,
-      );
-    } else if (cleanTerm != null && cleanTerm.isNotEmpty) {
-      debugPrint('🔍 Executando busca com operadores (AND/OR habilitados)');
-      data = await QuotesHelper.fetchQuotes(
-        term: cleanTerm,
-        selectedType: selectedType,
-        sortMode: _sortMode,
-      );
-    } else {
-      debugPrint('⚙️ Fallback: modo $_sortMode sem termo');
-      data = await QuotesHelper.fetchQuotes(
-        term: null,
-        selectedType: selectedType,
-        sortMode: _sortMode,
-      );
-    }
-
-    // 🎨 Filtro colorido — aplicado localmente SEM refazer fetch
-    if (selectedType != null) {
-      final before = data.length;
-      data = data.where((q) => q['type'] == selectedType).toList();
-      debugPrint('🎨 Filtro de tipo aplicado localmente → ${data.length}/$before mantidas');
-    }
-
-    setState(() {
-      quotes = data;
-      isLoading = false;
-    });
+    setState(() => isLoading = false);
   }
 
   void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
-    _fetchQuotes(term: searchCtrl.text.isEmpty ? null : searchCtrl.text);
+    _runSearch();
   }
 
   void _copyQuote(Map<String, dynamic> q) {
@@ -110,8 +58,10 @@ class _QuotesScreenState extends State<QuotesScreen> {
     final author = q['books']?['author'] ?? 'Autor desconhecido';
     final title = q['books']?['title'] ?? 'Livro não informado';
     final formatted = '$text\n\npor $author, em $title';
+
     Clipboard.setData(ClipboardData(text: formatted));
     HapticFeedback.lightImpact();
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('📋 Citação copiada!'),
@@ -129,7 +79,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
         setState(() {
           selectedType = active ? null : t;
         });
-        _fetchQuotes(term: searchCtrl.text);
+        await _runSearch();
       },
       child: Container(
         width: 22,
@@ -163,6 +113,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
         bottom: false,
         child: Column(
           children: [
+            // 🔍 Campo de busca
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: TextField(
@@ -178,7 +129,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                       searchCtrl.clear();
                       selectedType = null;
                       FocusScope.of(context).unfocus();
-                      _fetchQuotes();
+                      await _runSearch();
                     },
                   ),
                   filled: true,
@@ -187,12 +138,12 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                 ),
-                onSubmitted: (term) => _fetchQuotes(term: term),
+                onSubmitted: (term) => _runSearch(),
               ),
             ),
+
+            // 🎨 Bolinhas + ações
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
@@ -209,30 +160,31 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     tooltip: 'Recarregar do Supabase',
                     onPressed: () async {
                       await QuotesCacheManager.clearCache(_globalCacheKey);
-                      await _fetchQuotes(forceRefresh: true);
+                      await _runSearch(forceRefresh: true);
                     },
                   ),
                   IconButton(
                     icon: const Icon(Icons.shuffle, color: Colors.white70),
-                    tooltip: 'Shuffle',
                     onPressed: () => _changeSortMode('random'),
                   ),
                   IconButton(
                     icon: const Icon(Icons.arrow_upward, color: Colors.white70),
-                    tooltip: 'Newest',
                     onPressed: () => _changeSortMode('one_per_book_desc'),
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 6),
+
+            // 📜 Lista
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : RefreshIndicator(
                       onRefresh: () async {
                         await QuotesCacheManager.clearCache(_globalCacheKey);
-                        await _fetchQuotes(forceRefresh: true);
+                        await _runSearch(forceRefresh: true);
                       },
                       child: ListView.builder(
                         padding: const EdgeInsets.all(12),
@@ -246,8 +198,11 @@ class _QuotesScreenState extends State<QuotesScreen> {
                                 quotes[i]['is_favorite'] =
                                     quotes[i]['is_favorite'] == 1 ? 0 : 1;
                               });
+
                               await QuotesCacheManager.saveQuotes(
-                                  _globalCacheKey, quotes);
+                                _globalCacheKey,
+                                quotes,
+                              );
                             },
                           );
                         },

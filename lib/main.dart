@@ -6,6 +6,8 @@ import 'package:hive_flutter/hive_flutter.dart'; // ✅ adicionado
 
 // Utils
 import 'utils/quotes_cache_manager.dart'; // ✅ novo módulo
+import 'utils/books_cache_manager.dart';
+import 'utils/books_search_manager.dart';
 
 // Screens
 import 'screens/quotes_screen.dart';

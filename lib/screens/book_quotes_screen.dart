@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/quote_card.dart';
 import 'book_characters_screen.dart';
-import '../utils/quotes_helper.dart';
-import '../utils/quotes_cache_manager.dart'; // ✅ adicionado para cache
+import '../utils/quotes_cache_manager.dart';
+import '../utils/quotes_search_manager.dart';   // ⭐ NOVO
 
 class BookQuotesScreen extends StatefulWidget {
   final int bookId;
@@ -24,88 +24,52 @@ class BookQuotesScreen extends StatefulWidget {
 }
 
 class _BookQuotesScreenState extends State<BookQuotesScreen> {
-  final supabase = Supabase.instance.client;
   final searchCtrl = TextEditingController();
+
   bool isLoading = true;
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
 
-  static bool _hasLoadedOnce = false; // ✅ evita refetch
-  late final String _bookCacheKey; // ✅ cache exclusivo por livro
+  late final String _bookCacheKey;
+  static bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
+
     _bookCacheKey = 'book_cache_${widget.bookId}';
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!_hasLoadedOnce) {
-        await _fetchQuotes();
-        _hasLoadedOnce = true;
-      } else {
-        debugPrint('🧠 Reuso de cache — ${widget.bookTitle}');
-        await _fetchQuotes();
-      }
+      await _runSearch();
+      _hasLoadedOnce = true;
     });
   }
 
-  Future<void> _fetchQuotes({String? term, bool forceRefresh = false}) async {
+  Future<void> _runSearch({bool forceRefresh = false}) async {
     setState(() => isLoading = true);
 
-    final cleanTerm = term?.trim();
-    List<Map<String, dynamic>> data = [];
+    quotes = await QuotesSearchManager.search(
+      origin: 'book',                    // ⭐ regra da busca
+      rawTerm: searchCtrl.text,
+      typeFilter: selectedType,
+      sortMode: 'none',                  // livros não têm sortMode especial
+      bookId: widget.bookId,
+      cacheKey: _bookCacheKey,
+      forceRefresh: forceRefresh,
+    );
 
-    final bool canUseCache =
-        (!forceRefresh && (cleanTerm == null || cleanTerm.isEmpty));
-
-    if (canUseCache) {
-      final cached = await QuotesCacheManager.loadQuotes(_bookCacheKey);
-      if (cached != null && cached.isNotEmpty) {
-        debugPrint('💾 Cache (${widget.bookTitle}) carregado (${cached.length} itens)');
-        // 🔹 aplica filtro local por bookId
-        data = List<Map<String, dynamic>>.from(
-          cached.where((q) => q['book_id'] == widget.bookId),
-        );
-      } else {
-        debugPrint('⚙️ Nenhum cache (${widget.bookTitle}), buscando Supabase...');
-        data = await QuotesHelper.fetchQuotes(
-          term: null,
-          selectedType: selectedType,
-          bookId: widget.bookId,
-        );
-
-        // 🔹 salva apenas citações deste livro
-        final filteredData = data.where((q) => q['book_id'] == widget.bookId).toList();
-        await QuotesCacheManager.saveQuotes(_bookCacheKey, filteredData);
-
-        debugPrint('🧠 Cache criado com ${filteredData.length} citações');
-      }
-    }
-
-
-    // 🎨 Filtro colorido aplicado localmente (sem refazer fetch)
-    if (selectedType != null) {
-      final before = data.length;
-      data = data.where((q) => q['type'] == selectedType).toList();
-      debugPrint('🎨 Filtro aplicado localmente → ${data.length}/$before mantidas');
-    }
-
-    setState(() {
-      quotes = data;
-      isLoading = false;
-    });
+    setState(() => isLoading = false);
   }
-
-  // ------------------------------ UI --------------------------------------
 
   Widget _typeDot(int t, Color fill) {
     final bool active = selectedType == t;
+
     return GestureDetector(
       onTap: () async {
         setState(() {
           selectedType = active ? null : t;
         });
-        await _fetchQuotes(term: searchCtrl.text);
+        await _runSearch();
       },
       child: Container(
         width: 22,
@@ -134,6 +98,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
+
       appBar: AppBar(
         title: Text(
           widget.bookTitle,
@@ -163,6 +128,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
 
       body: Column(
         children: [
+          // 📘 Cabeçalho do livro
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Row(
@@ -219,6 +185,8 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
               ],
             ),
           ),
+
+          // 🔍 Campo de busca
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
             child: TextField(
@@ -234,7 +202,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                     searchCtrl.clear();
                     selectedType = null;
                     FocusScope.of(context).unfocus();
-                    await _fetchQuotes();
+                    await _runSearch();
                   },
                 ),
                 filled: true,
@@ -243,12 +211,12 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
-              onSubmitted: (term) => _fetchQuotes(term: term),
+              onSubmitted: (term) => _runSearch(),
             ),
           ),
+
+          // 🎨 Bolinhas
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -260,28 +228,35 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
               _typeDot(6, gray),
             ],
           ),
+
           const SizedBox(height: 6),
+
+          // 📜 Lista
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: () async {
                       await QuotesCacheManager.clearCache(_bookCacheKey);
-                      await _fetchQuotes(forceRefresh: true);
+                      await _runSearch(forceRefresh: true);
                     },
                     child: ListView.builder(
                       padding: const EdgeInsets.all(12),
                       itemCount: quotes.length,
-                      itemBuilder: (context, i) => QuoteCard(
-                        quote: {
-                          ...quotes[i],
-                          'books': {
-                            'title': widget.bookTitle,
-                            'author': widget.bookAuthor,
-                            'cover': widget.bookCover,
+                      itemBuilder: (context, i) {
+                        final q = quotes[i];
+
+                        return QuoteCard(
+                          quote: {
+                            ...q,
+                            'books': {
+                              'title': widget.bookTitle,
+                              'author': widget.bookAuthor,
+                              'cover': widget.bookCover,
+                            },
                           },
-                        },
-                      ),
+                        );
+                      },
                     ),
                   ),
           ),
