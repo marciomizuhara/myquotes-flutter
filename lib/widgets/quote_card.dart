@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/colors.dart';
 import '../widgets/type_selector.dart';
+import '../widgets/cached_cover_image.dart';
 
 class QuoteCard extends StatefulWidget {
   final Map<String, dynamic> quote;
@@ -38,7 +40,10 @@ class _QuoteCardState extends State<QuoteCard> {
     if (_saving) return;
     setState(() => _saving = true);
     try {
-      await supabase.from('quotes').update({'notes': newText}).eq('id', widget.quote['id']);
+      await supabase
+          .from('quotes')
+          .update({'notes': newText})
+          .eq('id', widget.quote['id']);
     } catch (e) {
       debugPrint('Erro ao atualizar nota: $e');
     } finally {
@@ -55,7 +60,7 @@ class _QuoteCardState extends State<QuoteCard> {
         widget.quote['is_favorite'] = newValue;
       });
 
-      final updated = await supabase
+      await supabase
           .from('quotes')
           .update({'is_favorite': newValue})
           .eq('id', widget.quote['id'])
@@ -63,7 +68,6 @@ class _QuoteCardState extends State<QuoteCard> {
           .maybeSingle();
 
       widget.onFavoriteChanged?.call();
-
     } catch (e) {
       debugPrint('❌ Erro ao atualizar favorito: $e');
     }
@@ -81,8 +85,10 @@ class _QuoteCardState extends State<QuoteCard> {
     final author = q['books']?['author'] ?? 'Autor desconhecido';
     final title = q['books']?['title'] ?? 'Livro não informado';
     final formatted = '$text\n\n$author - $title';
+
     Clipboard.setData(ClipboardData(text: formatted));
     HapticFeedback.lightImpact();
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('📋 Citação copiada!'),
@@ -104,7 +110,6 @@ class _QuoteCardState extends State<QuoteCard> {
     final color = colorByType(_safeType(q['type']));
     final note = _notesCtrl.text.trim();
 
-    // 🔹 Tratar página
     final String pageText = (q['page'] == null ||
             q['page'].toString().trim().isEmpty ||
             q['page'].toString() == 'null')
@@ -126,18 +131,18 @@ class _QuoteCardState extends State<QuoteCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (cover.isNotEmpty)
-                    ClipRRect(
+                    CachedCoverImage(
+                      url: cover,
+                      width: 48,
+                      height: 70,
                       borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        cover,
-                        width: 48,
-                        height: 70,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, _, __) =>
-                            Container(width: 48, height: 70, color: Colors.black26),
-                      ),
                     ),
+
                   if (cover.isNotEmpty) const SizedBox(width: 6),
+
+                  // -------------------------------------------------
+                  // TEXTO DA CITAÇÃO + TÍTULO + AUTOR + PÁGINA
+                  // -------------------------------------------------
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +158,6 @@ class _QuoteCardState extends State<QuoteCard> {
                         ),
                         const SizedBox(height: 4),
 
-                        // 🔹 Título / autor / página
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
@@ -181,7 +185,6 @@ class _QuoteCardState extends State<QuoteCard> {
                               ),
                             ),
 
-                            // 🔹 Página substituída
                             Padding(
                               padding: const EdgeInsets.only(left: 4, bottom: 1),
                               child: GestureDetector(
@@ -199,7 +202,6 @@ class _QuoteCardState extends State<QuoteCard> {
                                     color: Colors.white54,
                                     fontSize: 11,
                                     fontStyle: FontStyle.normal,
-                                    decoration: TextDecoration.none,
                                   ),
                                 ),
                               ),
@@ -213,7 +215,7 @@ class _QuoteCardState extends State<QuoteCard> {
               ),
 
               Padding(
-                padding: const EdgeInsets.only(top: 2, left: 0, bottom: 0),
+                padding: const EdgeInsets.only(top: 2),
                 child: _editing ? _buildEditRow(note) : _buildNormalRow(note),
               ),
             ],

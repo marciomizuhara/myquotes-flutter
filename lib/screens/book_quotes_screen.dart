@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/quote_card.dart';
 import 'book_characters_screen.dart';
 import '../utils/quotes_cache_manager.dart';
-import '../utils/quotes_search_manager.dart';   // ⭐ NOVO
+import '../utils/quotes_search_manager.dart';
+import '../widgets/cached_cover_image.dart';
 
 class BookQuotesScreen extends StatefulWidget {
   final int bookId;
@@ -49,10 +51,10 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
     setState(() => isLoading = true);
 
     quotes = await QuotesSearchManager.search(
-      origin: 'book',                    // ⭐ regra da busca
+      origin: 'book',
       rawTerm: searchCtrl.text,
       typeFilter: selectedType,
-      sortMode: 'none',                  // livros não têm sortMode especial
+      sortMode: 'none',
       bookId: widget.bookId,
       cacheKey: _bookCacheKey,
       forceRefresh: forceRefresh,
@@ -134,22 +136,15 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                ClipRRect(
+                CachedCoverImage(
+                  url: widget.bookCover ?? '',
+                  width: 80,
+                  height: 110,
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    widget.bookCover ?? '',
-                    width: 80,
-                    height: 110,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 80,
-                      height: 110,
-                      color: Colors.black26,
-                      child: const Icon(Icons.broken_image, color: Colors.white38),
-                    ),
-                  ),
                 ),
+
                 const SizedBox(width: 14),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +226,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
 
           const SizedBox(height: 6),
 
-          // 📜 Lista
+          // 📜 Lista de citações
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())

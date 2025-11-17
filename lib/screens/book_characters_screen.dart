@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/characters_helper.dart';
 import '../widgets/character_card.dart';
+import '../widgets/cached_cover_image.dart';
 
 class BookCharactersScreen extends StatefulWidget {
   final int bookId;
@@ -34,10 +36,12 @@ class _BookCharactersScreenState extends State<BookCharactersScreen> {
 
   Future<void> _fetchCharacters() async {
     setState(() => isLoading = true);
+
     final data = await CharactersHelper.fetchCharacters(
       orderMode: orderMode,
       bookId: widget.bookId,
     );
+
     setState(() {
       characters = data;
       isLoading = false;
@@ -63,27 +67,32 @@ class _BookCharactersScreenState extends State<BookCharactersScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.arrow_upward,
-                color: orderMode == 'desc' ? Colors.amber : Colors.white),
+            icon: Icon(
+              Icons.arrow_upward,
+              color: orderMode == 'desc' ? Colors.amber : Colors.white,
+            ),
             tooltip: 'Maior nota primeiro',
             onPressed: () => _setOrder('desc'),
           ),
           IconButton(
-            icon: Icon(Icons.shuffle,
-                color: orderMode == 'random' ? Colors.amber : Colors.white),
+            icon: Icon(
+              Icons.shuffle,
+              color: orderMode == 'random' ? Colors.amber : Colors.white,
+            ),
             tooltip: 'Aleatório',
             onPressed: () => _setOrder('random'),
           ),
           IconButton(
-            icon: Icon(Icons.arrow_downward,
-                color: orderMode == 'asc' ? Colors.amber : Colors.white),
+            icon: Icon(
+              Icons.arrow_downward,
+              color: orderMode == 'asc' ? Colors.amber : Colors.white,
+            ),
             tooltip: 'Menor nota primeiro',
             onPressed: () => _setOrder('asc'),
           ),
         ],
       ),
 
-      // 🔹 Corpo
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.amber))
           : Column(
@@ -94,23 +103,15 @@ class _BookCharactersScreenState extends State<BookCharactersScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Capa do livro
-                      ClipRRect(
+                      // Capa do livro (agora com cache)
+                      CachedCoverImage(
+                        url: widget.bookCover ?? '',
+                        width: 80,
+                        height: 110,
                         borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          widget.bookCover ?? '',
-                          width: 80,
-                          height: 110,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 80,
-                            height: 110,
-                            color: Colors.black26,
-                            child: const Icon(Icons.broken_image,
-                                color: Colors.white38),
-                          ),
-                        ),
                       ),
+
+
                       const SizedBox(width: 14),
 
                       // Informações do livro

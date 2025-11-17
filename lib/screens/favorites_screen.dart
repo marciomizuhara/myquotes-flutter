@@ -29,7 +29,7 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _runSearch();
+      await _runSearch(forceRefresh: true);
       _hasLoadedOnce = true;
     });
   }

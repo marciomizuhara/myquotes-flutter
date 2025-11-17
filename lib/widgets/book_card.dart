@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../screens/book_quotes_screen.dart';
+import '../widgets/cached_cover_image.dart';
 
 class BookCard extends StatelessWidget {
   final int bookId;
@@ -43,25 +45,16 @@ class BookCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔹 Capa do livro
-            ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(10)),
-              child: Image.network(
-                cover,
-                height: 165,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 120,
-                  color: Colors.black26,
-                  child: const Icon(Icons.broken_image,
-                      color: Colors.white38, size: 28),
-                ),
-              ),
+            // 🔹 Capa do livro (agora com CACHE)
+            CachedCoverImage(
+              url: cover,
+              height: 165,
+              width: double.infinity,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
             ),
 
-            // 🔹 Informações do livro
+
+            // 🔹 Informações
             Padding(
               padding: const EdgeInsets.all(8),
               child: Column(

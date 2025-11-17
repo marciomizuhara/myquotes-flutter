@@ -5,6 +5,14 @@ import 'quotes_cache_manager.dart';
 class QuotesSearchManager {
   static final supabase = Supabase.instance.client;
 
+  // 🔥 Normalizador universal de TYPE (resolve o bug do Favorites)
+  static int _normalizeType(dynamic raw) {
+    if (raw == null) return 0;
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw.toString()) ?? 0;
+  }
+
   /// ------------------------------------------------------------
   ///  Função única para todas as buscas do app
   /// ------------------------------------------------------------
@@ -23,26 +31,23 @@ class QuotesSearchManager {
     List<Map<String, dynamic>> results = [];
 
     // ------------------------------------------------------------
-    //  CASO 1: pode usar cache (somente quando NÃO tem busca)
+    //  CASO 1: usar cache (somente quando NÃO tem busca)
     // ------------------------------------------------------------
     if (!hasTerm && !forceRefresh) {
       final cached = await QuotesCacheManager.loadQuotes(cacheKey);
       if (cached != null && cached.isNotEmpty) {
         final list = List<Map<String, dynamic>>.from(cached);
 
-        // filtro de livro (bookId)
         if (origin == 'book' && bookId != null) {
           results = list.where((q) => q['book_id'] == bookId).toList();
         } else {
           results = list;
         }
 
-        // random local se sortMode for random
         if (sortMode == 'random') {
           results.shuffle();
         }
 
-        // filtro local de tipo
         if (typeFilter != null) {
           results = results.where((q) => q['type'] == typeFilter).toList();
         }
@@ -52,36 +57,36 @@ class QuotesSearchManager {
     }
 
     // ------------------------------------------------------------
-    //  CASO 2: busca complexa → usar RPC
+    //  CASO 2: busca complexa (AND/OR)
     // ------------------------------------------------------------
     if (hasTerm && _isComplexQuery(term!)) {
       results = await _runComplexSearch(term, origin, bookId);
     }
 
     // ------------------------------------------------------------
-    //  CASO 3: busca simples por termo → fallback Supabase/RPC
+    //  CASO 3: busca simples via RPC
     // ------------------------------------------------------------
     else if (hasTerm) {
       results = await _runSimpleSearch(term!, origin, bookId);
     }
 
     // ------------------------------------------------------------
-    //  CASO 4: sem termo → usar fetchQuotes com sortMode
+    //  CASO 4: sem termo → carregar padrão
     // ------------------------------------------------------------
     else {
       results = await _loadDefaultData(origin, bookId, sortMode);
     }
 
     // ------------------------------------------------------------
-    //  Filtro local por tipo
+    //  Filtro local por tipo (dependente do TYPE NORMALIZADO!!)
     // ------------------------------------------------------------
     if (typeFilter != null) {
       results = results.where((q) => q['type'] == typeFilter).toList();
     }
 
     // ------------------------------------------------------------
-    //  Salvar cache APENAS quando:
-    //  - não é busca, e
+    //  Salva cache apenas quando:
+    //  - não tem busca
     //  - resultado não é vazio
     // ------------------------------------------------------------
     if (!hasTerm && results.isNotEmpty) {
@@ -92,14 +97,14 @@ class QuotesSearchManager {
   }
 
   /// ------------------------------------------------------------
-  ///  Detecta se a busca contém OR/AND
+  ///  Detecta OR/AND
   /// ------------------------------------------------------------
   static bool _isComplexQuery(String term) {
     return term.contains(' OR ') || term.contains(' AND ');
   }
 
   /// ------------------------------------------------------------
-  ///  Executa busca com AND / OR usando RPC
+  ///  Busca complexa usando RPC
   /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> _runComplexSearch(
     String term,
@@ -112,7 +117,6 @@ class QuotesSearchManager {
 
     for (final orSegment in orParts) {
       final andParts = orSegment.split(' AND ');
-
       List<Map<String, dynamic>>? andResult;
 
       for (final raw in andParts) {
@@ -125,6 +129,10 @@ class QuotesSearchManager {
 
         final current = (res as List).map<Map<String, dynamic>>((e) {
           final q = Map<String, dynamic>.from(e);
+
+          // normaliza TYPE
+          q['type'] = _normalizeType(q['type']);
+
           q['books'] = {
             'title': q['book_title'],
             'author': q['book_author'],
@@ -167,7 +175,7 @@ class QuotesSearchManager {
   }
 
   /// ------------------------------------------------------------
-  ///  Busca simples via RPC
+  ///  Busca simples RPC
   /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> _runSimpleSearch(
     String term,
@@ -180,6 +188,9 @@ class QuotesSearchManager {
 
     var list = (res as List).map<Map<String, dynamic>>((e) {
       final q = Map<String, dynamic>.from(e);
+
+      q['type'] = _normalizeType(q['type']);
+
       q['books'] = {
         'title': q['book_title'],
         'author': q['book_author'],
@@ -210,14 +221,26 @@ class QuotesSearchManager {
     int? bookId,
     String sortMode,
   ) async {
+
+    // ⭐ AQUI ESTAVA O BUG REAL
+    // Favoritos vinham com TYPE SUJO
     if (origin == 'favorites') {
-      return await supabase
+      final data = await supabase
           .from('quotes')
           .select(
             'id, text, page, type, notes, is_favorite::int, book_id, books(title, author, cover)',
           )
           .eq('is_favorite', 1)
           .order('id', ascending: true);
+
+      return data.map<Map<String, dynamic>>((e) {
+        final q = Map<String, dynamic>.from(e);
+
+        // 🔥 normalização obrigatória
+        q['type'] = _normalizeType(q['type']);
+
+        return q;
+      }).toList();
     }
 
     return await QuotesHelper.fetchQuotes(
