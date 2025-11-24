@@ -45,6 +45,8 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
       cacheKey: _favoritesCacheKey,
       forceRefresh: forceRefresh,
     );
+    // ⭐ Embaralhar SEM quebrar cache
+    quotes.shuffle();
 
     setState(() => isLoading = false);
   }

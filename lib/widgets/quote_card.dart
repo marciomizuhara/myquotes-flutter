@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/colors.dart';
 import '../widgets/type_selector.dart';
 import '../widgets/cached_cover_image.dart';
+import '../screens/book_quotes_screen.dart'; // 👈 IMPORT NECESSÁRIO
 
 class QuoteCard extends StatefulWidget {
   final Map<String, dynamic> quote;
@@ -99,6 +100,28 @@ class _QuoteCardState extends State<QuoteCard> {
     );
   }
 
+  void _openBook(Map<String, dynamic> book, Map<String, dynamic> q) {
+    final bookId = q['book_id'];
+
+    if (bookId == null) {
+      debugPrint('⚠️ QuoteCard: bookId ausente, não navegando.');
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookQuotesScreen(
+          bookId: bookId,
+          bookTitle: book['title'] ?? '',
+          bookAuthor: book['author'] ?? '',
+          bookCover: book['cover'],
+        ),
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final q = widget.quote;
@@ -131,18 +154,18 @@ class _QuoteCardState extends State<QuoteCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (cover.isNotEmpty)
-                    CachedCoverImage(
-                      url: cover,
-                      width: 48,
-                      height: 70,
-                      borderRadius: BorderRadius.circular(6),
+                    GestureDetector(
+                      onTap: () => _openBook(book, q), // 👈 CAPA CLICÁVEL
+                      child: CachedCoverImage(
+                        url: cover,
+                        width: 48,
+                        height: 70,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
 
                   if (cover.isNotEmpty) const SizedBox(width: 6),
 
-                  // -------------------------------------------------
-                  // TEXTO DA CITAÇÃO + TÍTULO + AUTOR + PÁGINA
-                  // -------------------------------------------------
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
