@@ -1,16 +1,61 @@
-# myquotes_app
+# MyQuotes (Flutter)
 
-A new Flutter project.
+Flutter client application for a data-driven literary system, designed to consume structured data via RPC and SQL-backed backend services.
+
+This project represents the **client layer** of the MyQuotes ecosystem, focusing on browsing, searching, and navigating normalized literary data derived from processed Kindle highlights.
+
+---
+
+## Overview
+
+The application provides a clean and efficient interface for interacting with structured datasets produced by a backend data pipeline.  
+It emphasizes clarity, performance, and maintainable UI flows driven by well-defined data models.
+
+The backend system (implemented separately) is responsible for data ingestion, ETL workflows, normalization, and persistence, while this Flutter client focuses exclusively on data consumption and presentation.
+
+---
+
+## Key Features
+
+- Search and filtering over structured literary datasets
+- Navigation by books, authors, characters, and quotes
+- Data-driven UI powered by normalized backend models
+- Clear separation between client and backend responsibilities
+- Emphasis on maintainability and readability
+
+---
+
+## Architecture
+
+- **Client:** Flutter
+- **Communication:** RPC / API-based integration
+- **Data Source:** SQL-backed backend services
+- **Design Approach:** Client-server separation with data-centric UI flows
+
+The application is intentionally designed as a thin client, delegating data processing and business logic to the backend layer.
+
+---
+
+## Related Project
+
+- **MyQuotes (Flask Backend):**  
+  Backend service responsible for data ingestion, ETL, modeling, and storage of Kindle highlights.
+
+---
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter run
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Notes
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Environment-specific configuration files (e.g., secrets or API endpoints) are intentionally excluded from version control and should be provided locally when running the application.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Author
+
+Developed by Márcio Martins
+Data Engineer | Big Data Analyst | Technical Documentation Specialist
+
