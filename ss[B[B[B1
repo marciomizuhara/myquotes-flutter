@@ -1,0 +1,89 @@
+[33mcommit 1b73a34be55bfb097da4b2de61fe9402375e5d64[m[33m ([m[1;36mHEAD -> [m[1;32mrestore-v1.6[m[33m, [m[1;33mtag: 1.10[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Mon Nov 24 19:05:49 2025 -0300
+
+    Fixed Favorites Auto-Shuffle + QuoteCover Navigation
+
+[33mcommit 90a61ade3a598495d99e596fb2721b4ff434c734[m[33m ([m[1;33mtag: v1.9[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Mon Nov 17 18:45:05 2025 -0300
+
+    fixed filtering on FavoritesScreen + implemented image caching
+
+[33mcommit 0f2f320af42cab6873c97ba9010da807e62c2913[m[33m ([m[1;33mtag: v1.8.2[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Sun Nov 16 23:02:16 2025 -0300
+
+    Implemented sorting icons on book screen
+
+[33mcommit df4f72fbbf4c5e4d4fabb7fa34dd4f4d12215fbd[m[33m ([m[1;33mtag: v1.8.1[m[33m, [m[1;33mtag: v1.8[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Wed Nov 12 22:40:33 2025 -0300
+
+    v1.8 — Modularização completa (BookCard, TypeSelector), unificação visual, correções QotD, melhorias de UX e fix de fallback de página (--).
+
+[33mcommit 62ff6417e34eb8fed74f879add2222faff7c9f9c[m[33m ([m[1;33mtag: v1.7.1[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Tue Nov 11 22:43:52 2025 -0300
+
+    feat: release MyQuotes App v1.7 – stable cache, favorites & filters
+
+[33mcommit 678689462c2d8c2e61c3a2b4ffe80bcc4ae79683[m[33m ([m[1;33mtag: v1.7[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Tue Nov 11 20:12:29 2025 -0300
+
+    feat: release MyQuotes App v1.7 – stable cache, favorites & filters
+
+[33mcommit 88e65561cf59d6d1759d363f8fcc0e63674accfd[m[33m ([m[1;33mtag: v1.6[m[33m, [m[1;32mmaster[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Sun Nov 9 12:02:32 2025 -0300
+
+    v1.6 – ordenação por livro (ASC/DESC), RPCs e minor sorting fixes
+
+[33mcommit 9cc11001987fa503d0e57ba03d67e2b76db2cd16[m[33m ([m[1;33mtag: v1.5[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Fri Nov 7 17:08:12 2025 -0300
+
+    Versão 1.5 — Quote of the Day persistente + busca com AND/OR + copy feature
+
+[33mcommit 8b249edd406f55409b105c28cfd32f976322899f[m[33m ([m[1;33mtag: v1.4[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Thu Nov 6 18:35:10 2025 -0300
+
+    ✨ v1.4 – Adicionada tela 'Quote of the Day' com layout estilo stories, seed diário determinístico e integração Supabase estável
+
+[33mcommit 921b598072c92710cdefe0d6d2728163e01608af[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Thu Nov 6 18:19:54 2025 -0300
+
+    ✨ v1.4 – Adicionada tela 'Quote of the Day' com layout estilo stories, seed diário determinístico e integração Supabase estável
+
+[33mcommit ffd2df8414f45a96e6739917d15fcdd8547c030b[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Thu Nov 6 17:45:21 2025 -0300
+
+    ✨ v1.4 – Adicionada tela 'Quote of the Day' com layout estilo stories, seed diário determinístico e integração Supabase estável
+
+[33mcommit a552443b6d0eecb18e076507bac41a04cf247f62[m[33m ([m[1;33mtag: v1.3[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Thu Nov 6 12:11:20 2025 -0300
+
+    ✨ Versão estável com favoritos, edição inline e tipo cinza (v1.3)
+
+[33mcommit 1f228594a23af9a7fb84e1b2157e05709b1ad39e[m[33m ([m[1;33mtag: v1.2[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Thu Nov 6 10:36:52 2025 -0300
+
+    ✨ Versão estável com favoritos, edição inline e tipo cinza (v2.3)
+
+[33mcommit 054a1b750ad2a9e36ec6f58407c957a505659fc8[m[33m ([m[1;33mtag: v1.1[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Wed Nov 5 21:55:54 2025 -0300
+
+    v1.1 — Stable version with favorites feature implemented and verified
+
+[33mcommit 29a9e5e9775d1741bb3031c93c170a6a09b73997[m[33m ([m[1;33mtag: v1.0[m[33m, [m[1;32mmain[m[33m)[m
+Author: marciomizuhara <marciomizu@gmail.com>
+Date:   Wed Nov 5 16:52:15 2025 -0300
+
+    release 1.0 stable
