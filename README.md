@@ -1,8 +1,30 @@
-# MyQuotes (Flutter)
+# MyQuotes - Flutter 
 
 Flutter client application for a data-driven literary system, designed to consume structured data via RPC and SQL-backed backend services.
 
 This project represents the **client layer** of the MyQuotes ecosystem, focusing on browsing, searching, and navigating normalized literary data derived from processed Kindle highlights.
+
+---
+
+## 🖼️ Application Previews
+
+<table>
+  <tr>
+    <td align="center">
+      <b>Home Screen</b><br><br>
+      <img src="https://github.com/user-attachments/assets/1ecd082d-4654-485b-a105-54652af0cb15" width="250">
+    </td>
+    <td align="center">
+      <b>Search and Filters</b><br><br>
+      <img src="https://github.com/user-attachments/assets/b7a222c2-129f-46dd-b1bc-3f00ba5def07" width="250">
+    </td>
+    <td align="center">
+      <b>Quote Details</b><br><br>
+      <img src="https://github.com/user-attachments/assets/3c246acf-a805-41c5-bc71-9029579c2ea4" width="250">
+    </td>
+  </tr>
+</table>
+
 
 ---
 
