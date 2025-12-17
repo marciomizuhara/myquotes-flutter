@@ -5,7 +5,7 @@ import '../widgets/book_card.dart';
 import '../utils/books_cache_manager.dart';
 import '../utils/books_search_manager.dart';
 
-enum SortMode { asc, desc, shuffle }
+enum SortMode { asc, desc, shuffle, ratingDesc }
 
 class BooksScreen extends StatefulWidget {
   const BooksScreen({Key? key}) : super(key: key);
@@ -46,11 +46,17 @@ class _BooksScreenState extends State<BooksScreen> {
 
   void _setSort(SortMode mode) {
     setState(() {
-      sortMode = mode;
+      if (sortMode == mode) {
+        sortMode = SortMode.shuffle;
+        sortModeString = 'shuffle';
+      } else {
+        sortMode = mode;
 
-      if (mode == SortMode.asc) sortModeString = 'asc';
-      if (mode == SortMode.desc) sortModeString = 'desc';
-      if (mode == SortMode.shuffle) sortModeString = 'shuffle';
+        if (mode == SortMode.asc) sortModeString = 'asc';
+        if (mode == SortMode.desc) sortModeString = 'desc';
+        if (mode == SortMode.shuffle) sortModeString = 'shuffle';
+        if (mode == SortMode.ratingDesc) sortModeString = 'rating_desc';
+      }
     });
 
     _runSearchBooks();
@@ -66,7 +72,7 @@ class _BooksScreenState extends State<BooksScreen> {
         child: Column(
           children: [
             // ------------------------------------------------------------
-            // 🔍 Search bar — igual QuotesScreen
+            // 🔍 Search bar
             // ------------------------------------------------------------
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -97,7 +103,7 @@ class _BooksScreenState extends State<BooksScreen> {
             ),
 
             // ------------------------------------------------------------
-            // 🔽 Barra de ações — igual QuotesScreen (refresh, shuffle, asc)
+            // 🔽 Barra de ações
             // ------------------------------------------------------------
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -112,6 +118,16 @@ class _BooksScreenState extends State<BooksScreen> {
                     },
                   ),
                   const Spacer(),
+                  IconButton(
+                    icon: Icon(
+                      Icons.emoji_events,
+                      color: sortMode == SortMode.ratingDesc
+                          ? Colors.amber
+                          : Colors.white70,
+                    ),
+                    tooltip: 'Sort by rating',
+                    onPressed: () => _setSort(SortMode.ratingDesc),
+                  ),
                   IconButton(
                     icon: const Icon(Icons.arrow_upward, color: Colors.white70),
                     tooltip: "ASC",
@@ -131,11 +147,10 @@ class _BooksScreenState extends State<BooksScreen> {
               ),
             ),
 
-
             const SizedBox(height: 6),
 
             // ------------------------------------------------------------
-            // 📚 Grid de livros (mantido igual)
+            // 📚 Grid de livros
             // ------------------------------------------------------------
             Expanded(
               child: isLoading
@@ -161,13 +176,18 @@ class _BooksScreenState extends State<BooksScreen> {
                         itemCount: books.length,
                         itemBuilder: (context, index) {
                           final book = books[index];
+                          final bookId = book['id'] as int;
+
                           return BookCard(
-                            bookId: book['id'] as int,
+                            key: ValueKey(bookId), // ✅ FIX CRÍTICO
+                            bookId: bookId,
                             title: (book['title'] ?? '').toString(),
                             author: (book['author'] ?? '').toString(),
                             cover: (book['cover'] ?? '').toString(),
                             quotesCount:
                                 (book['quotes_count'] ?? 0) as int,
+                            rating:
+                                (book['rating'] as num?)?.toDouble(),
                           );
                         },
                       ),

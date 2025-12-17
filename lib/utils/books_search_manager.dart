@@ -10,7 +10,7 @@ class BooksSearchManager {
   /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> search({
     String? rawTerm,
-    required String sortMode,          // 'asc', 'desc', 'shuffle'
+    required String sortMode,          // 'asc', 'desc', 'shuffle', 'rating_desc'
     required String cacheKey,
     bool forceRefresh = false,
   }) async {
@@ -122,7 +122,7 @@ class BooksSearchManager {
   ) async {
     final res = await supabase
         .from('books')
-        .select('id, title, author, cover, quotes(id)')
+        .select('id, title, author, cover, rating, quotes(id)')
         .or('title.ilike.%$term%,author.ilike.%$term%');
 
     final list = List<Map<String, dynamic>>.from(res as List);
@@ -142,7 +142,7 @@ class BooksSearchManager {
   static Future<List<Map<String, dynamic>>> _fetchAllBooks() async {
     final res = await supabase
         .from('books')
-        .select('id, title, author, cover, quotes(id)')
+        .select('id, title, author, cover, rating, quotes(id)')
         .limit(2000);
 
     final list = List<Map<String, dynamic>>.from(res as List);
@@ -164,10 +164,16 @@ class BooksSearchManager {
   ) {
     final items = List<Map<String, dynamic>>.from(list);
 
-    if (sortMode == 'asc') {
-      items.sort((a, b) => a['title'].toString().compareTo(b['title'].toString()));
+    if (sortMode == 'rating_desc') {
+      items.removeWhere((b) => b['rating'] == null);
+      items.sort((a, b) =>
+          (b['rating'] as num).compareTo(a['rating'] as num));
+    } else if (sortMode == 'asc') {
+      items.sort((a, b) =>
+          a['title'].toString().compareTo(b['title'].toString()));
     } else if (sortMode == 'desc') {
-      items.sort((a, b) => b['title'].toString().compareTo(a['title'].toString()));
+      items.sort((a, b) =>
+          b['title'].toString().compareTo(a['title'].toString()));
     } else {
       items.shuffle(Random());
     }

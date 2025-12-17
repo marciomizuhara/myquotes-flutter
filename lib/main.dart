@@ -21,7 +21,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ✅ Lê o .env manualmente dos assets (funciona no Android)
-  final envData = await rootBundle.loadString('assets/env.txt');
+  final envData = await rootBundle.loadString('env.txt');
   final Map<String, String> envMap = {};
   for (var line in envData.split('\n')) {
     if (line.trim().isEmpty || line.startsWith('#')) continue;
