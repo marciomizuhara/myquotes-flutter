@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
-import '../widgets/type_selector.dart';
+import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_cache_manager.dart';
-import '../utils/quotes_search_manager.dart';   // ⭐ NOVO
+import '../utils/quotes_search_manager.dart';
 
 class FavoriteQuotesScreen extends StatefulWidget {
   const FavoriteQuotesScreen({Key? key}) : super(key: key);
 
   @override
-  State<FavoriteQuotesScreen> createState() => _FavoriteQuotesScreenState();
+  State<FavoriteQuotesScreen> createState() =>
+      _FavoriteQuotesScreenState();
 }
 
 class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
@@ -22,57 +22,32 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
 
   String _sortMode = 'random';
   static const _favoritesCacheKey = 'favorites_cache_v1';
-  static bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _runSearch(forceRefresh: true);
-      _hasLoadedOnce = true;
     });
   }
 
   Future<void> _runSearch({bool forceRefresh = false}) async {
     setState(() => isLoading = true);
 
-    quotes = await QuotesSearchManager.search(
-      origin: 'favorites',               // ⭐ tudo customizado por aqui
+    var result = await QuotesSearchManager.search(
+      origin: 'favorites',
       rawTerm: searchCtrl.text,
       typeFilter: selectedType,
       sortMode: _sortMode,
       cacheKey: _favoritesCacheKey,
       forceRefresh: forceRefresh,
+      onlyActive: true,
     );
-    // ⭐ Embaralhar SEM quebrar cache
-    quotes.shuffle();
+
+    result.shuffle();
+    quotes = result;
 
     setState(() => isLoading = false);
-  }
-
-  void _changeSortMode(String mode) async {
-    setState(() => _sortMode = mode);
-    await _runSearch();
-  }
-
-  void _copyQuote(Map<String, dynamic> q) {
-    final text = q['text'] ?? '';
-    final author = q['books']?['author'] ?? 'Autor desconhecido';
-    final title = q['books']?['title'] ?? 'Livro não informado';
-    final formatted = '$text\n\n$author - $title';
-
-    Clipboard.setData(ClipboardData(text: formatted));
-    HapticFeedback.lightImpact();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('📋 Citação copiada!'),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.black87,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   Widget _typeDot(int t, Color fill) {
@@ -86,8 +61,8 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
         await _runSearch();
       },
       child: Container(
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
@@ -117,16 +92,14 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
         bottom: false,
         child: Column(
           children: [
-            // 🔍 Busca
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: TextField(
                 controller: searchCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: '',
-                  hintStyle: const TextStyle(color: Colors.white54),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                  prefixIcon:
+                      const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, color: Colors.white70),
                     onPressed: () async {
@@ -143,76 +116,70 @@ class _FavoriteQuotesScreenState extends State<FavoriteQuotesScreen> {
                     borderSide: BorderSide.none,
                   ),
                 ),
-                onSubmitted: (term) => _runSearch(),
+                onSubmitted: (_) => _runSearch(),
               ),
             ),
 
-            // 🎨 Bolinhas + ações
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                children: [
-                  _typeDot(1, red),
-                  _typeDot(2, yellow),
-                  _typeDot(3, green),
-                  _typeDot(4, blue),
-                  _typeDot(5, cyan),
-                  _typeDot(6, gray),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, color: Colors.white70),
-                    tooltip: 'Recarregar do Supabase',
-                    onPressed: () async {
-                      await QuotesCacheManager.clearCache(_favoritesCacheKey);
-                      await _runSearch(forceRefresh: true);
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.shuffle, color: Colors.white70),
-                    tooltip: 'Aleatórias',
-                    onPressed: () => _changeSortMode('random'),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_upward, color: Colors.white70),
-                    tooltip: 'Mais recentes',
-                    onPressed: () => _changeSortMode('newest'),
-                  ),
-                ],
-              ),
+            QuotesTopControls(
+              typeDots: [
+                _typeDot(1, red),
+                _typeDot(2, yellow),
+                _typeDot(3, green),
+                _typeDot(4, blue),
+                _typeDot(5, cyan),
+                _typeDot(6, gray),
+              ],
+              trailingActions: [
+                IconButton(
+                  iconSize: 20,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon:
+                      const Icon(Icons.refresh, color: Colors.white70),
+                  tooltip: 'Recarregar favoritos',
+                  onPressed: () async {
+                    await QuotesCacheManager.clearCache(
+                        _favoritesCacheKey);
+                    await _runSearch(forceRefresh: true);
+                  },
+                ),
+                IconButton(
+                  iconSize: 20,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon:
+                      const Icon(Icons.shuffle, color: Colors.white70),
+                  onPressed: () => _runSearch(),
+                ),
+              ],
             ),
 
             const SizedBox(height: 6),
 
-            // 📜 Lista
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        await QuotesCacheManager.clearCache(_favoritesCacheKey);
-                        await _runSearch(forceRefresh: true);
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: quotes.length,
+                      itemBuilder: (context, i) {
+                        final q = quotes[i];
+                        return QuoteCard(
+                          quote: q,
+                          onFavoriteChanged: () async {
+                            setState(() {
+                              quotes[i]['is_favorite'] =
+                                  quotes[i]['is_favorite'] == 1
+                                      ? 0
+                                      : 1;
+                            });
+                            await QuotesCacheManager.saveQuotes(
+                              _favoritesCacheKey,
+                              quotes,
+                            );
+                          },
+                        );
                       },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: quotes.length,
-                        itemBuilder: (context, i) {
-                          final q = quotes[i];
-                          return QuoteCard(
-                            quote: q,
-                            onFavoriteChanged: () async {
-                              setState(() {
-                                quotes[i]['is_favorite'] =
-                                    quotes[i]['is_favorite'] == 1 ? 0 : 1;
-                              });
-
-                              await QuotesCacheManager.saveQuotes(
-                                _favoritesCacheKey,
-                                quotes,
-                              );
-                            },
-                          );
-                        },
-                      ),
                     ),
             ),
           ],

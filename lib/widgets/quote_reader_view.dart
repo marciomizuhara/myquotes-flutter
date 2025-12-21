@@ -221,6 +221,7 @@ class _QuoteReaderViewState extends State<QuoteReaderView>
                                 context,
                                 currentType: q['type'],
                                 quoteId: q['id'],
+                                isActive: q['is_active'] == true, // ✅ Adicionado
                                 onTypeChanged: _updateQuoteType,
                               );
                             },

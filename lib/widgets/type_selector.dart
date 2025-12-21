@@ -6,6 +6,7 @@ class TypeSelector {
     BuildContext context, {
     required int? currentType,
     required int quoteId,
+    required bool isActive,
     required Function(int) onTypeChanged,
   }) async {
     final supabase = Supabase.instance.client;
@@ -30,63 +31,120 @@ class TypeSelector {
           top: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 6),
-
-            // 🔥 Wrap faz o layout fluir mesmo em telas pequenas, sem overflow
             child: Wrap(
               alignment: WrapAlignment.center,
-              spacing: 10,   // 🔹 espaçamento horizontal
-              runSpacing: 12, // 🔹 espaçamento vertical (se quebrar linha)
-              children: colors.entries.map((entry) {
-                final isActive = entry.key == currentType;
+              spacing: 10,
+              runSpacing: 12,
+              children: [
+                // ------------------------------------------------------------
+                // Tipos normais (cores)
+                // ------------------------------------------------------------
+                ...colors.entries.map((entry) {
+                  final isSelected = entry.key == currentType;
 
-                return GestureDetector(
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      try {
+                        await supabase
+                            .from('quotes')
+                            .update({'type': entry.key})
+                            .eq('id', quoteId);
+
+                        onTypeChanged(entry.key);
+                      } catch (e) {
+                        debugPrint('❌ Erro ao atualizar tipo: $e');
+                      }
+                    },
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: isSelected ? 30 : 26,
+                        height: isSelected ? 30 : 26,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: entry.value,
+                          border: Border.all(
+                            color:
+                                isSelected ? Colors.amber : Colors.white24,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: entry.value.withOpacity(0.8),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : [],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+                // ------------------------------------------------------------
+                // Ocultar / Restaurar quote (toggle)
+                // ------------------------------------------------------------
+                GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: () async {
                     Navigator.pop(context);
+
+                    final int newValue = isActive ? 0 : 1;
+
                     try {
                       await supabase
                           .from('quotes')
-                          .update({'type': entry.key})
+                          .update({'is_active': newValue})
                           .eq('id', quoteId);
 
-                      onTypeChanged(entry.key);
-                      debugPrint('🟢 Tipo da citação atualizado para ${entry.key}');
+                      final message = newValue == 1
+                          ? 'Quote restaurada'
+                          : 'Quote ocultada';
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(message),
+                          duration: const Duration(milliseconds: 900),
+                        ),
+                      );
                     } catch (e) {
-                      debugPrint('❌ Erro ao atualizar tipo: $e');
+                      debugPrint('❌ Erro ao atualizar is_active: $e');
                     }
                   },
-
-                  // 🔥 Área de toque grande e consistente (NÃO estoura o layout)
                   child: Container(
                     width: 56,
                     height: 56,
                     alignment: Alignment.center,
-
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: isActive ? 30 : 26,  // 🔹 tamanho otimizado
-                      height: isActive ? 30 : 26,
+                      duration: const Duration(milliseconds: 150),
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: entry.value,
+                        color: Colors.transparent,
                         border: Border.all(
-                          color: isActive ? Colors.amber : Colors.white24,
-                          width: isActive ? 2 : 1,
+                          color: Colors.amberAccent,
+                          width: 1.5,
                         ),
-                        boxShadow: isActive
-                            ? [
-                                BoxShadow(
-                                  color: entry.value.withOpacity(0.8),
-                                  blurRadius: 10,
-                                  spreadRadius: 2,
-                                )
-                              ]
-                            : [],
+                      ),
+                      child: Icon(
+                        isActive
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 20,
+                        color: Colors.amberAccent,
                       ),
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
         );

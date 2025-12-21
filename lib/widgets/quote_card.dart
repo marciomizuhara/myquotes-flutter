@@ -29,6 +29,8 @@ class _QuoteCardState extends State<QuoteCard> {
   bool _saving = false;
   late bool _isFavorite;
 
+  bool _isPressing = false;
+
   @override
   void initState() {
     super.initState();
@@ -36,10 +38,6 @@ class _QuoteCardState extends State<QuoteCard> {
 
     final raw = widget.quote['is_favorite'];
     _isFavorite = raw == 1 || raw == true || raw == '1';
-
-    debugPrint(
-      '❤️ initState → id=${widget.quote['id']} is_favorite=$raw (_isFavorite=$_isFavorite)',
-    );
   }
 
   Future<void> _updateNotes(String newText) async {
@@ -51,30 +49,108 @@ class _QuoteCardState extends State<QuoteCard> {
           .from('quotes')
           .update({'notes': newText})
           .eq('id', widget.quote['id']);
-    } catch (e) {
-      debugPrint('Erro ao atualizar nota: $e');
     } finally {
       setState(() => _saving = false);
     }
   }
 
   Future<void> _toggleFavorite() async {
-    try {
-      final newValue = _isFavorite ? 0 : 1;
+    final newValue = _isFavorite ? 0 : 1;
 
-      setState(() {
-        _isFavorite = !_isFavorite;
-        widget.quote['is_favorite'] = newValue;
-      });
+    setState(() {
+      _isFavorite = !_isFavorite;
+      widget.quote['is_favorite'] = newValue;
+    });
+
+    await supabase
+        .from('quotes')
+        .update({'is_favorite': newValue})
+        .eq('id', widget.quote['id']);
+
+    widget.onFavoriteChanged?.call();
+  }
+
+  /// 🔴 ÚNICA FUNÇÃO ALTERADA
+  Future<void> _confirmAndDeactivateQuote() async {
+    final int isActive =
+        (widget.quote['is_active'] == 1 || widget.quote['is_active'] == true)
+            ? 1
+            : 0;
+
+    // ----------------------------
+    // Se a quote estiver ATIVA → confirmar ocultação
+    // ----------------------------
+    if (isActive == 1) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          title: const Text(
+            'Ocultar quote',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Esta quote será ocultada e não aparecerá mais nas listas.\n\nDeseja continuar?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Ocultar',
+                style: TextStyle(color: Colors.redAccent),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
 
       await supabase
           .from('quotes')
-          .update({'is_favorite': newValue})
+          .update({'is_active': 0})
           .eq('id', widget.quote['id']);
 
-      widget.onFavoriteChanged?.call();
-    } catch (e) {
-      debugPrint('❌ Erro ao atualizar favorito: $e');
+      setState(() {
+        widget.quote['is_active'] = 0;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Quote ocultada'),
+            duration: Duration(milliseconds: 900),
+          ),
+        );
+      }
+
+      return;
+    }
+
+    // ----------------------------
+    // Se a quote estiver OCULTA → restaurar direto
+    // ----------------------------
+    await supabase
+        .from('quotes')
+        .update({'is_active': 1})
+        .eq('id', widget.quote['id']);
+
+    setState(() {
+      widget.quote['is_active'] = 1;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quote restaurada'),
+          duration: Duration(milliseconds: 900),
+        ),
+      );
     }
   }
 
@@ -87,11 +163,7 @@ class _QuoteCardState extends State<QuoteCard> {
 
   void _openBook(Map<String, dynamic> book, Map<String, dynamic> q) {
     final bookId = q['book_id'];
-
-    if (bookId == null) {
-      debugPrint('⚠️ QuoteCard: bookId ausente, não navegando.');
-      return;
-    }
+    if (bookId == null) return;
 
     Navigator.push(
       context,
@@ -106,18 +178,45 @@ class _QuoteCardState extends State<QuoteCard> {
     );
   }
 
+  Future<void> _handleLongPressCopy(
+    Map<String, dynamic> q,
+    Map<String, dynamic> book,
+  ) async {
+    _isPressing = true;
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!_isPressing) return;
+
+    final text = (q['text'] ?? '').toString().trim();
+    final author = (book['author'] ?? '').toString().trim();
+    final title = (book['title'] ?? '').toString().trim();
+
+    final content = '$text\n\n$author - $title';
+
+    await Clipboard.setData(ClipboardData(text: content));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quote copiada'),
+          duration: Duration(milliseconds: 800),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final q = widget.quote;
-
     final Map<String, dynamic> book =
         (q['books'] is Map<String, dynamic>) ? q['books'] : {};
-    final String cover = (book['cover'] ?? '').toString();
 
+    final cover = (book['cover'] ?? '').toString();
     final color = colorByType(_safeType(q['type']));
     final note = _notesCtrl.text.trim();
 
-    final String pageText = (q['page'] == null ||
+    final pageText = (q['page'] == null ||
             q['page'].toString().trim().isEmpty ||
             q['page'].toString() == 'null')
         ? '--'
@@ -137,6 +236,9 @@ class _QuoteCardState extends State<QuoteCard> {
             ),
           );
         },
+        onTapDown: (_) => _handleLongPressCopy(q, book),
+        onTapUp: (_) => _isPressing = false,
+        onTapCancel: () => _isPressing = false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
           child: Column(
@@ -204,7 +306,12 @@ class _QuoteCardState extends State<QuoteCard> {
                                   context,
                                   currentType: _safeType(q['type']),
                                   quoteId: q['id'],
+                                  isActive: q['is_active'] == 1,
                                   onTypeChanged: (newType) {
+                                    if (newType == -1) {
+                                      _confirmAndDeactivateQuote();
+                                      return;
+                                    }
                                     setState(
                                         () => widget.quote['type'] = newType);
                                   },
@@ -281,8 +388,7 @@ class _QuoteCardState extends State<QuoteCard> {
     return Row(
       children: [
         IconButton(
-          icon:
-              const Icon(Icons.edit_note, color: Colors.white70, size: 17),
+          icon: const Icon(Icons.edit_note, color: Colors.white70, size: 17),
           onPressed: () => setState(() => _editing = true),
         ),
         Expanded(
