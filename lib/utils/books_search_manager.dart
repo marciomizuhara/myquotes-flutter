@@ -122,15 +122,15 @@ class BooksSearchManager {
   ) async {
     final res = await supabase
         .from('books')
-        .select('id, title, author, cover, rating, quotes(id)')
+        .select('id, title, author, cover, rating, quotes(count)')
         .or('title.ilike.%$term%,author.ilike.%$term%');
 
     final list = List<Map<String, dynamic>>.from(res as List);
 
     // Contar quotes
     for (final b in list) {
-      final quotes = b['quotes'] as List<dynamic>? ?? [];
-      b['quotes_count'] = quotes.length;
+      final quotes = b['quotes'] as Map<String, dynamic>?;
+      b['quotes_count'] = quotes?['count'] ?? 0;
     }
 
     return list;
@@ -142,7 +142,7 @@ class BooksSearchManager {
   static Future<List<Map<String, dynamic>>> _fetchAllBooks() async {
     final res = await supabase
         .from('books')
-        .select('id, title, author, cover, rating, quotes(id)')
+        .select('id, title, author, cover, rating, quotes(count)')
         .limit(2000);
 
     final list = List<Map<String, dynamic>>.from(res as List);

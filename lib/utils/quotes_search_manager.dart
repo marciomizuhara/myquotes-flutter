@@ -5,7 +5,6 @@ import 'quotes_cache_manager.dart';
 class QuotesSearchManager {
   static final supabase = Supabase.instance.client;
 
-  // 🔥 Normalizador universal de TYPE
   static int _normalizeType(dynamic raw) {
     if (raw == null) return 0;
     if (raw is int) return raw;
@@ -13,9 +12,6 @@ class QuotesSearchManager {
     return int.tryParse(raw.toString()) ?? 0;
   }
 
-  /// ------------------------------------------------------------
-  ///  Função única para todas as buscas do app
-  /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> search({
     required String origin, // 'global', 'favorites', 'book'
     int? bookId,
@@ -27,18 +23,21 @@ class QuotesSearchManager {
     bool onlyActive = true,
   }) async {
     final term = rawTerm?.trim();
-    bool hasTerm = term != null && term.isNotEmpty;
+    final hasTerm = term != null && term.isNotEmpty;
+
+    if (origin == 'book' && bookId == null) {
+      throw Exception('bookId is required when origin == "book"');
+    }
 
     List<Map<String, dynamic>> results = [];
 
     // ------------------------------------------------------------
-    //  1) Cache local
+    // 1) Cache
     // ------------------------------------------------------------
     if (!hasTerm && !forceRefresh) {
       final cached = await QuotesCacheManager.loadQuotes(cacheKey);
       if (cached != null && cached.isNotEmpty) {
-        final list = List<Map<String, dynamic>>.from(cached)
-            .map<Map<String, dynamic>>((q) {
+        results = cached.map<Map<String, dynamic>>((q) {
           final m = Map<String, dynamic>.from(q);
           m['type'] = _normalizeType(m['type']);
           m['is_active'] = (m['is_active'] is int)
@@ -47,60 +46,56 @@ class QuotesSearchManager {
           return m;
         }).toList();
 
-        if (origin == 'book' && bookId != null) {
-          results = list.where((q) => q['book_id'] == bookId).toList();
-        } else {
-          results = list;
+        if (origin == 'book') {
+          results =
+              results.where((q) => q['book_id'] == bookId).toList();
         }
 
-        if (sortMode == 'random') results.shuffle();
-
         if (typeFilter != null) {
-          results = results.where((q) => q['type'] == typeFilter).toList();
+          results =
+              results.where((q) => q['type'] == typeFilter).toList();
         }
 
         if (onlyActive) {
-          results = results.where((q) => q['is_active'] == 1).toList();
+          results =
+              results.where((q) => q['is_active'] == 1).toList();
         }
 
+        if (sortMode == 'random') results.shuffle();
         return results;
       }
     }
 
     // ------------------------------------------------------------
-    //  2) Busca complexa (AND / OR)
+    // 2) Busca complexa
     // ------------------------------------------------------------
     if (hasTerm && _isComplexQuery(term!)) {
       results = await _runComplexSearch(term, origin, bookId);
     }
 
     // ------------------------------------------------------------
-    //  3) Busca simples via RPC
+    // 3) Busca simples
     // ------------------------------------------------------------
     else if (hasTerm) {
       results = await _runSimpleSearch(term!, origin, bookId);
     }
 
     // ------------------------------------------------------------
-    //  4) Sem termo → carregamento padrão
+    // 4) Default
     // ------------------------------------------------------------
     else {
       results = await _loadDefaultData(
         origin,
         bookId,
-        sortMode,
         onlyActive: onlyActive,
       );
     }
 
-    // ------------------------------------------------------------
-    //  Filtros adicionais
-    // ------------------------------------------------------------
     if (typeFilter != null) {
-      results = results.where((q) => q['type'] == typeFilter).toList();
+      results =
+          results.where((q) => q['type'] == typeFilter).toList();
     }
 
-    // Cache persistente
     if (!hasTerm && results.isNotEmpty && onlyActive) {
       await QuotesCacheManager.saveQuotes(cacheKey, results);
     }
@@ -108,22 +103,16 @@ class QuotesSearchManager {
     return results;
   }
 
-  /// ------------------------------------------------------------
-  ///  Detecta OR/AND
-  /// ------------------------------------------------------------
   static bool _isComplexQuery(String term) {
     return term.contains(' OR ') || term.contains(' AND ');
   }
 
-  /// ------------------------------------------------------------
-  ///  Busca complexa RPC
-  /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> _runComplexSearch(
     String term,
     String origin,
     int? bookId,
   ) async {
-    final Map<int, Map<String, dynamic>> allResults = {};
+    final Map<int, Map<String, dynamic>> merged = {};
     final orParts = term.split(' OR ');
 
     for (final orSegment in orParts) {
@@ -163,31 +152,24 @@ class QuotesSearchManager {
 
       if (andResult != null) {
         for (final q in andResult) {
-          allResults[q['id']] = q;
+          merged[q['id']] = q;
         }
       }
     }
 
-    var finalList = allResults.values.toList();
+    var list = merged.values.toList();
 
     if (origin == 'favorites') {
-      finalList = finalList.where((q) {
-        final f = q['is_favorite'];
-        return f == 1 || f == true || f == '1';
-      }).toList();
+      list = list.where((q) => q['is_favorite'] == 1).toList();
     }
 
-    if (origin == 'book' && bookId != null) {
-      finalList =
-          finalList.where((q) => q['book_id'] == bookId).toList();
+    if (origin == 'book') {
+      list = list.where((q) => q['book_id'] == bookId).toList();
     }
 
-    return finalList;
+    return list;
   }
 
-  /// ------------------------------------------------------------
-  ///  Busca simples RPC
-  /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> _runSimpleSearch(
     String term,
     String origin,
@@ -212,29 +194,21 @@ class QuotesSearchManager {
     }).toList();
 
     if (origin == 'favorites') {
-      list = list.where((q) {
-        final f = q['is_favorite'];
-        return f == 1 || f == true || f == '1';
-      }).toList();
+      list = list.where((q) => q['is_favorite'] == 1).toList();
     }
 
-    if (origin == 'book' && bookId != null) {
+    if (origin == 'book') {
       list = list.where((q) => q['book_id'] == bookId).toList();
     }
 
     return list;
   }
 
-  /// ------------------------------------------------------------
-  ///  Carregamento padrão (sem termo)
-  /// ------------------------------------------------------------
   static Future<List<Map<String, dynamic>>> _loadDefaultData(
     String origin,
-    int? bookId,
-    String sortMode, {
+    int? bookId, {
     bool onlyActive = true,
   }) async {
-    // 🧠 Caso FAVORITOS → filtra por favoritos
     if (origin == 'favorites') {
       final data = await supabase
           .from('quotes')
@@ -242,36 +216,58 @@ class QuotesSearchManager {
             'id, text, page, type, notes, is_favorite::int, is_active, book_id, books(title, author, cover)',
           )
           .eq('is_favorite', 1)
-          .order('id', ascending: true);
+          .order('id');
 
       return data.map<Map<String, dynamic>>((e) {
         final q = Map<String, dynamic>.from(e);
         q['type'] = _normalizeType(q['type']);
-        q['is_active'] = (q['is_active'] is int)
-            ? q['is_active']
-            : ((q['is_active'] == true) ? 1 : 0);
+        q['is_active'] =
+            q['is_active'] == true || q['is_active'] == 1 ? 1 : 0;
         return q;
       }).toList();
     }
 
-    // 🌍 Caso GLOBAL → busca tudo sem filtros no servidor
+    // 🔴 CORREÇÃO CRÍTICA: BOOK
+    if (origin == 'book') {
+      final data = await supabase
+          .from('quotes')
+          .select(
+            'id, text, page, type, notes, is_favorite::int, is_active, book_id, books(title, author, cover)',
+          )
+          .eq('book_id', bookId!)
+          .order('id');
+
+      var list = data.map<Map<String, dynamic>>((e) {
+        final q = Map<String, dynamic>.from(e);
+        q['type'] = _normalizeType(q['type']);
+        q['is_active'] =
+            q['is_active'] == true || q['is_active'] == 1 ? 1 : 0;
+        return q;
+      }).toList();
+
+      if (onlyActive) {
+        list = list.where((q) => q['is_active'] == 1).toList();
+      }
+
+      return list;
+    }
+
+    // 🌍 GLOBAL
     final data = await supabase
         .from('quotes')
         .select(
           'id, text, page, type, notes, is_favorite::int, is_active, book_id, books(title, author, cover)',
         )
-        .order('id', ascending: true);
+        .order('id');
 
     var list = data.map<Map<String, dynamic>>((e) {
       final q = Map<String, dynamic>.from(e);
       q['type'] = _normalizeType(q['type']);
-      q['is_active'] = (q['is_active'] is int)
-          ? q['is_active']
-          : ((q['is_active'] == true) ? 1 : 0);
+      q['is_active'] =
+          q['is_active'] == true || q['is_active'] == 1 ? 1 : 0;
       return q;
     }).toList();
 
-    // aplica filtro só depois
     if (onlyActive) {
       list = list.where((q) => q['is_active'] == 1).toList();
     }

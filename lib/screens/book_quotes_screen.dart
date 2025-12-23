@@ -39,7 +39,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
   void initState() {
     super.initState();
 
-    _bookCacheKey = 'book_cache_${widget.bookId}';
+    _bookCacheKey = 'book_quotes_cache_${widget.bookId}';
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _runSearch();
