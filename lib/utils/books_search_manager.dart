@@ -127,10 +127,16 @@ class BooksSearchManager {
 
     final list = List<Map<String, dynamic>>.from(res as List);
 
-    // Contar quotes
+    // Contar quotes (quotes(count) vem como LISTA)
     for (final b in list) {
-      final quotes = b['quotes'] as Map<String, dynamic>?;
-      b['quotes_count'] = quotes?['count'] ?? 0;
+      final quotes = b['quotes'] as List<dynamic>?;
+
+      if (quotes != null && quotes.isNotEmpty) {
+        final first = quotes.first as Map<String, dynamic>;
+        b['quotes_count'] = first['count'] ?? 0;
+      } else {
+        b['quotes_count'] = 0;
+      }
     }
 
     return list;
@@ -148,8 +154,14 @@ class BooksSearchManager {
     final list = List<Map<String, dynamic>>.from(res as List);
 
     for (final b in list) {
-      final quotes = b['quotes'] as List<dynamic>? ?? [];
-      b['quotes_count'] = quotes.length;
+      final quotes = b['quotes'] as List<dynamic>?;
+
+      if (quotes != null && quotes.isNotEmpty) {
+        final first = quotes.first as Map<String, dynamic>;
+        b['quotes_count'] = first['count'] ?? 0;
+      } else {
+        b['quotes_count'] = 0;
+      }
     }
 
     return list;

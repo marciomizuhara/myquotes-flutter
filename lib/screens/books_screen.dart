@@ -28,8 +28,13 @@ class _BooksScreenState extends State<BooksScreen> {
   @override
   void initState() {
     super.initState();
-    _runSearchBooks();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await BooksCacheManager.clear(); // 👈 AQUI
+      await _runSearchBooks(forceRefresh: true);
+    });
   }
+
 
   Future<void> _runSearchBooks({bool forceRefresh = false}) async {
     setState(() => isLoading = true);
