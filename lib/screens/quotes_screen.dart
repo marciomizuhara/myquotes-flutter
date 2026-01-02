@@ -30,7 +30,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _runSearch(forceRefresh: true);
+      await _runSearch(forceRefresh: !_hasLoadedOnce);
       _hasLoadedOnce = true;
     });
   }

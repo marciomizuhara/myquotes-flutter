@@ -108,6 +108,17 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
         ),
         backgroundColor: const Color(0xFF1A1A1A),
         actions: [
+          // 🔄 Refresh cache do livro
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh quotes from database',
+            onPressed: () async {
+              await QuotesCacheManager.clearCache(_bookCacheKey);
+              await _runSearch(forceRefresh: true);
+            },
+          ),
+
+          // 👥 Personagens
           IconButton(
             icon: const Icon(Icons.people_alt, color: Colors.white),
             tooltip: 'Ver personagens deste livro',
@@ -181,7 +192,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
             ),
           ),
 
-          // 🔍 Campo de busca
+          // 🔍 Busca
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
             child: TextField(
@@ -207,11 +218,11 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onSubmitted: (term) => _runSearch(),
+              onSubmitted: (_) => _runSearch(),
             ),
           ),
 
-          // 🎨 Bolinhas
+          // 🎨 Tipos
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -226,7 +237,7 @@ class _BookQuotesScreenState extends State<BookQuotesScreen> {
 
           const SizedBox(height: 6),
 
-          // 📜 Lista de citações
+          // 📜 Lista
           Expanded(
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
