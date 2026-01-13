@@ -29,7 +29,7 @@ class _QuoteCardState extends State<QuoteCard> {
   bool _saving = false;
   late bool _isFavorite;
 
-  bool _isPressing = false;
+  bool _actionMode = false;
 
   @override
   void initState() {
@@ -70,16 +70,35 @@ class _QuoteCardState extends State<QuoteCard> {
     widget.onFavoriteChanged?.call();
   }
 
-  /// 🔴 ÚNICA FUNÇÃO ALTERADA
+  Future<void> _copyQuote(
+    Map<String, dynamic> q,
+    Map<String, dynamic> book,
+  ) async {
+    final text = (q['text'] ?? '').toString().trim();
+    final author = (book['author'] ?? '').toString().trim();
+    final title = (book['title'] ?? '').toString().trim();
+
+    final content = '$text\n\n$author - $title';
+
+    await Clipboard.setData(ClipboardData(text: content));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quote copiada'),
+          duration: Duration(milliseconds: 800),
+        ),
+      );
+    }
+  }
+
+  /// 🔴 OCULTAR / RESTAURAR (usa is_active)
   Future<void> _confirmAndDeactivateQuote() async {
     final int isActive =
         (widget.quote['is_active'] == 1 || widget.quote['is_active'] == true)
             ? 1
             : 0;
 
-    // ----------------------------
-    // Se a quote estiver ATIVA → confirmar ocultação
-    // ----------------------------
     if (isActive == 1) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -116,9 +135,7 @@ class _QuoteCardState extends State<QuoteCard> {
           .update({'is_active': 0})
           .eq('id', widget.quote['id']);
 
-      setState(() {
-        widget.quote['is_active'] = 0;
-      });
+      setState(() => widget.quote['is_active'] = 0);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -128,26 +145,67 @@ class _QuoteCardState extends State<QuoteCard> {
           ),
         );
       }
-
       return;
     }
 
-    // ----------------------------
-    // Se a quote estiver OCULTA → restaurar direto
-    // ----------------------------
     await supabase
         .from('quotes')
         .update({'is_active': 1})
         .eq('id', widget.quote['id']);
 
-    setState(() {
-      widget.quote['is_active'] = 1;
-    });
+    setState(() => widget.quote['is_active'] = 1);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Quote restaurada'),
+          duration: Duration(milliseconds: 900),
+        ),
+      );
+    }
+  }
+
+  /// ❌ EXCLUIR DEFINITIVAMENTE (DELETE)
+  Future<void> _confirmAndDeleteQuote() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text(
+          'Excluir quote',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Esta quote será excluída permanentemente.\n\nEssa ação não pode ser desfeita.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Excluir',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await supabase
+        .from('quotes')
+        .delete()
+        .eq('id', widget.quote['id']);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quote excluída'),
           duration: Duration(milliseconds: 900),
         ),
       );
@@ -178,34 +236,6 @@ class _QuoteCardState extends State<QuoteCard> {
     );
   }
 
-  Future<void> _handleLongPressCopy(
-    Map<String, dynamic> q,
-    Map<String, dynamic> book,
-  ) async {
-    _isPressing = true;
-
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!_isPressing) return;
-
-    final text = (q['text'] ?? '').toString().trim();
-    final author = (book['author'] ?? '').toString().trim();
-    final title = (book['title'] ?? '').toString().trim();
-
-    final content = '$text\n\n$author - $title';
-
-    await Clipboard.setData(ClipboardData(text: content));
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Quote copiada'),
-          duration: Duration(milliseconds: 800),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final q = widget.quote;
@@ -228,6 +258,10 @@ class _QuoteCardState extends State<QuoteCard> {
       margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 2),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
+        onLongPress: () => setState(() => _actionMode = true),
+        onTap: () {
+          if (_actionMode) setState(() => _actionMode = false);
+        },
         onDoubleTap: () {
           Navigator.push(
             context,
@@ -236,110 +270,149 @@ class _QuoteCardState extends State<QuoteCard> {
             ),
           );
         },
-        onTapDown: (_) => _handleLongPressCopy(q, book),
-        onTapUp: (_) => _isPressing = false,
-        onTapCancel: () => _isPressing = false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (cover.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => _openBook(book, q),
-                      child: CachedCoverImage(
-                        url: cover,
-                        width: 48,
-                        height: 70,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                  if (cover.isNotEmpty) const SizedBox(width: 6),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          q['text'] ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            height: 1.3,
-                            fontSize: 13.5,
-                            letterSpacing: 0.05,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (cover.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => _openBook(book, q),
+                          child: CachedCoverImage(
+                            url: cover,
+                            width: 48,
+                            height: 70,
+                            borderRadius: BorderRadius.circular(6),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                      if (cover.isNotEmpty) const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    book['title'] ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.amberAccent,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  Text(
-                                    book['author'] ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 8.5,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              q['text'] ?? '',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                height: 1.3,
+                                fontSize: 13.5,
+                                letterSpacing: 0.05,
                               ),
                             ),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(left: 4, bottom: 1),
-                              child: GestureDetector(
-                                onTap: () => TypeSelector.show(
-                                  context,
-                                  currentType: _safeType(q['type']),
-                                  quoteId: q['id'],
-                                  isActive: q['is_active'] == 1,
-                                  onTypeChanged: (newType) {
-                                    if (newType == -1) {
-                                      _confirmAndDeactivateQuote();
-                                      return;
-                                    }
-                                    setState(
-                                        () => widget.quote['type'] = newType);
-                                  },
-                                ),
-                                child: Text(
-                                  'p. $pageText',
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    fontSize: 11,
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        book['title'] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.amberAccent,
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                      Text(
+                                        book['author'] ?? '',
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 8.5,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      left: 4, bottom: 1),
+                                  child: GestureDetector(
+                                    onTap: () => TypeSelector.show(
+                                      context,
+                                      currentType: _safeType(q['type']),
+                                      quoteId: q['id'],
+                                      isActive: q['is_active'] == 1,
+                                      onTypeChanged: (newType) {
+                                        if (newType == -1) {
+                                          _confirmAndDeactivateQuote();
+                                          return;
+                                        }
+                                        setState(() =>
+                                            widget.quote['type'] = newType);
+                                      },
+                                    ),
+                                    child: Text(
+                                      'p. $pageText',
+                                      style: const TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _editing
+                        ? _buildEditRow(note)
+                        : _buildNormalRow(note),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: _editing
-                    ? _buildEditRow(note)
-                    : _buildNormalRow(note),
+            ),
+
+            if (_actionMode)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.copy_all,
+                                size: 18, color: Colors.white70),
+                            onPressed: () async {
+                              await _copyQuote(q, book);
+                              setState(() => _actionMode = false);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close,
+                                size: 18, color: Colors.white70),
+                            onPressed: () async {
+                              setState(() => _actionMode = false);
+                              await _confirmAndDeleteQuote();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -374,7 +447,8 @@ class _QuoteCardState extends State<QuoteCard> {
           },
         ),
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.redAccent, size: 17),
+          icon:
+              const Icon(Icons.close, color: Colors.redAccent, size: 17),
           onPressed: () {
             _notesCtrl.text = note;
             setState(() => _editing = false);
@@ -388,7 +462,8 @@ class _QuoteCardState extends State<QuoteCard> {
     return Row(
       children: [
         IconButton(
-          icon: const Icon(Icons.edit_note, color: Colors.white70, size: 17),
+          icon:
+              const Icon(Icons.edit_note, color: Colors.white70, size: 17),
           onPressed: () => setState(() => _editing = true),
         ),
         Expanded(

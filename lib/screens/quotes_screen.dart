@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/services.dart';
 import '../widgets/quote_card.dart';
-import '../widgets/type_selector.dart';
 import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';
@@ -16,19 +13,21 @@ class QuotesScreen extends StatefulWidget {
 
 class _QuotesScreenState extends State<QuotesScreen> {
   final searchCtrl = TextEditingController();
+
   bool isLoading = true;
   List<Map<String, dynamic>> quotes = [];
   int? selectedType;
 
   bool _showInactive = false;
-
   String _sortMode = 'random';
-  static const _globalCacheKey = 'quotes_global_cache_v1';
+
+  static const _activeCacheKey = 'quotes_global_active_cache_v1';
   static bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _runSearch(forceRefresh: !_hasLoadedOnce);
       _hasLoadedOnce = true;
@@ -38,42 +37,56 @@ class _QuotesScreenState extends State<QuotesScreen> {
   Future<void> _runSearch({bool forceRefresh = false}) async {
     setState(() => isLoading = true);
 
-    var result = await QuotesSearchManager.search(
-      origin: 'global',
-      rawTerm: searchCtrl.text,
-      typeFilter: selectedType,
-      sortMode: _sortMode,
-      cacheKey: _globalCacheKey,
-      forceRefresh: forceRefresh,
-      onlyActive: !_showInactive,
-    );
+    List<Map<String, dynamic>> result;
 
+    // ============================================================
+    // 📦 MODO ARQUIVO (INATIVAS)
+    // - sempre remoto
+    // - sem cache
+    // - filtra localmente
+    // ============================================================
     if (_showInactive) {
+      debugPrint('🔎 BUSCA: modo ARQUIVO (inativas)');
+
+      result = await QuotesSearchManager.search(
+        origin: 'global',
+        rawTerm: searchCtrl.text,
+        typeFilter: selectedType,
+        sortMode: _sortMode,
+        cacheKey: 'archive_mode_tmp', // ✅ chave descartável
+        forceRefresh: true,           // ✅ sempre remoto
+        onlyActive: false,            // ✅ traz tudo
+      );
+
       result = result.where((q) {
         final a = q['is_active'];
-        return a == false || a == 0 || a == '0';
+        return a == 0 || a == false || a == '0';
       }).toList();
 
-      if (result.length < 2) {
-        final remote = await QuotesSearchManager.search(
-          origin: 'global',
-          rawTerm: searchCtrl.text,
-          typeFilter: selectedType,
-          sortMode: _sortMode,
-          cacheKey: _globalCacheKey,
-          forceRefresh: true,
-          onlyActive: false,
-        );
-
-        result = remote.where((q) {
-          final a = q['is_active'];
-          return a == false || a == 0 || a == '0';
-        }).toList();
-      }
+      debugPrint('📦 Inativas encontradas: ${result.length}');
     }
 
-    if (_sortMode == 'random' && !_showInactive) {
-      result.shuffle();
+    // ============================================================
+    // ⚡ MODO NORMAL (ATIVAS + CACHE)
+    // ============================================================
+    else {
+      debugPrint('⚡ BUSCA: modo NORMAL (ativas + cache)');
+
+      result = await QuotesSearchManager.search(
+        origin: 'global',
+        rawTerm: searchCtrl.text,
+        typeFilter: selectedType,
+        sortMode: _sortMode,
+        cacheKey: _activeCacheKey,
+        forceRefresh: forceRefresh,
+        onlyActive: true,
+      );
+
+      if (_sortMode == 'random') {
+        result.shuffle();
+      }
+
+      debugPrint('⚡ Ativas carregadas: ${result.length}');
     }
 
     quotes = result;
@@ -85,12 +98,13 @@ class _QuotesScreenState extends State<QuotesScreen> {
       _showInactive = !_showInactive;
       selectedType = null;
     });
-    await _runSearch(forceRefresh: true);
+
+    await _runSearch(forceRefresh: _showInactive);
   }
 
   void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
-    _runSearch();
+    await _runSearch();
   }
 
   Widget _typeDot(int t, Color fill) {
@@ -141,7 +155,8 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 controller: searchCtrl,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                  prefixIcon:
+                      const Icon(Icons.search, color: Colors.white54),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear, color: Colors.white70),
                     onPressed: () async {
@@ -193,7 +208,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
                       const Icon(Icons.refresh, color: Colors.white70),
                   onPressed: () async {
                     await QuotesCacheManager.clearCache(
-                        _globalCacheKey);
+                        _activeCacheKey);
                     await _runSearch(forceRefresh: true);
                   },
                 ),
@@ -223,34 +238,27 @@ class _QuotesScreenState extends State<QuotesScreen> {
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : RefreshIndicator(
-                      onRefresh: () async {
-                        await QuotesCacheManager.clearCache(
-                            _globalCacheKey);
-                        await _runSearch(forceRefresh: true);
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: quotes.length,
+                      itemBuilder: (context, i) {
+                        final q = quotes[i];
+                        return QuoteCard(
+                          quote: q,
+                          onFavoriteChanged: () async {
+                            setState(() {
+                              quotes[i]['is_favorite'] =
+                                  quotes[i]['is_favorite'] == 1
+                                      ? 0
+                                      : 1;
+                            });
+                            await QuotesCacheManager.saveQuotes(
+                              _activeCacheKey,
+                              quotes,
+                            );
+                          },
+                        );
                       },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: quotes.length,
-                        itemBuilder: (context, i) {
-                          final q = quotes[i];
-                          return QuoteCard(
-                            quote: q,
-                            onFavoriteChanged: () async {
-                              setState(() {
-                                quotes[i]['is_favorite'] =
-                                    quotes[i]['is_favorite'] == 1
-                                        ? 0
-                                        : 1;
-                              });
-                              await QuotesCacheManager.saveQuotes(
-                                _globalCacheKey,
-                                quotes,
-                              );
-                            },
-                          );
-                        },
-                      ),
                     ),
             ),
           ],
