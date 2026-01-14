@@ -44,6 +44,7 @@ Future<void> main() async {
     debugPrint('❌ Erro ao inicializar Supabase: $e\n$st');
   }
 
+
   // ✅ Inicialização do Hive e do CacheManager (na ordem certa)
   try {
     await Hive.initFlutter(); // inicializa o Hive

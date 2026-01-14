@@ -3,6 +3,7 @@ import '../widgets/quote_card.dart';
 import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';
+import 'vocabulary_screen.dart';
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -41,9 +42,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
 
     // ============================================================
     // 📦 MODO ARQUIVO (INATIVAS)
-    // - sempre remoto
-    // - sem cache
-    // - filtra localmente
     // ============================================================
     if (_showInactive) {
       debugPrint('🔎 BUSCA: modo ARQUIVO (inativas)');
@@ -53,9 +51,9 @@ class _QuotesScreenState extends State<QuotesScreen> {
         rawTerm: searchCtrl.text,
         typeFilter: selectedType,
         sortMode: _sortMode,
-        cacheKey: 'archive_mode_tmp', // ✅ chave descartável
-        forceRefresh: true,           // ✅ sempre remoto
-        onlyActive: false,            // ✅ traz tudo
+        cacheKey: 'archive_mode_tmp',
+        forceRefresh: true,
+        onlyActive: false,
       );
 
       result = result.where((q) {
@@ -100,6 +98,15 @@ class _QuotesScreenState extends State<QuotesScreen> {
     });
 
     await _runSearch(forceRefresh: _showInactive);
+  }
+
+  void _openVocabulary() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const VocabularyScreen(),
+      ),
+    );
   }
 
   void _changeSortMode(String mode) async {
@@ -186,18 +193,34 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 _typeDot(5, cyan),
                 _typeDot(6, gray),
               ],
-              leadingAction: IconButton(
-                iconSize: 20,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: Icon(
-                  _showInactive
-                      ? Icons.visibility
-                      : Icons.visibility_off,
-                  color:
-                      _showInactive ? Colors.amber : Colors.white38,
-                ),
-                onPressed: _toggleArchiveMode,
+              leadingAction: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(
+                      _showInactive
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: _showInactive
+                          ? Colors.amber
+                          : Colors.white38,
+                    ),
+                    onPressed: _toggleArchiveMode,
+                  ),
+                  IconButton(
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(
+                      Icons.abc,
+                      color: Colors.white38,
+                    ),
+                    onPressed: _openVocabulary,
+                  ),
+                ],
               ),
               trailingActions: [
                 IconButton(
