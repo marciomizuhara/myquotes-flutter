@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import '../utils/vocabulary_search_manager.dart';
 import '../widgets/vocabulary_card.dart';
+import 'translation_screen.dart';
 
-class VocabularyScreen extends StatefulWidget {
-  const VocabularyScreen({Key? key}) : super(key: key);
+class AnkiVocabularyScreen extends StatefulWidget {
+  const AnkiVocabularyScreen({Key? key}) : super(key: key);
 
   @override
-  State<VocabularyScreen> createState() => _VocabularyScreenState();
+  State<AnkiVocabularyScreen> createState() => _AnkiVocabularyScreenState();
 }
 
-class _VocabularyScreenState extends State<VocabularyScreen> {
+class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
   final searchCtrl = TextEditingController();
 
   bool isLoading = true;
@@ -32,12 +33,21 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
     setState(() => isLoading = false);
   }
 
+  void _openTranslation(Map<String, dynamic> vocab) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TranslationScreen(vocab: vocab),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
-        title: const Text('Vocabulary'),
+        title: const Text('ANKI Mode'),
         backgroundColor: const Color(0xFF121212),
       ),
       body: Column(
@@ -80,8 +90,11 @@ class _VocabularyScreenState extends State<VocabularyScreen> {
                     itemCount: vocabulary.length,
                     itemBuilder: (context, i) {
                       final v = vocabulary[i];
-                      return VocabularyCard(
-                        vocab: v,
+                      return GestureDetector(
+                        onTap: () => _openTranslation(v),
+                        child: VocabularyCard(
+                          vocab: v,
+                        ),
                       );
                     },
                   ),

@@ -17,19 +17,31 @@ class QuotesTopControls extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // grupo esquerdo: tipos + ação opcional (👁️)
-          Row(
-            children: [
-              ...typeDots,
-              if (leadingAction != null) leadingAction!,
-            ],
+          // ⬅️ AÇÕES FIXAS À ESQUERDA (👁️ + ABC)
+          if (leadingAction != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: leadingAction!,
+            ),
+
+          // 🔵 BOLINHAS — SEMPRE À ESQUERDA, SCROLL SE PRECISAR
+          Expanded(
+            child: SizedBox(
+              height: 28, // altura fixa evita "pulos" de layout
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(right: 6),
+                physics: const BouncingScrollPhysics(),
+                children: typeDots,
+              ),
+            ),
           ),
 
-          const Spacer(),
-
-          // grupo direito: ações
+          // ➡️ AÇÕES FIXAS À DIREITA
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: trailingActions,
           ),
         ],

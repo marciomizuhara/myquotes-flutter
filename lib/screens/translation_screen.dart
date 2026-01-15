@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:translator/translator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TranslationScreen extends StatefulWidget {
   final Map<String, dynamic> vocab;
@@ -15,6 +16,7 @@ class TranslationScreen extends StatefulWidget {
 
 class _TranslationScreenState extends State<TranslationScreen> {
   final translator = GoogleTranslator();
+  final supabase = Supabase.instance.client;
 
   bool _loading = true;
   String _translated = '';
@@ -23,14 +25,41 @@ class _TranslationScreenState extends State<TranslationScreen> {
 
   String get _originalText => (widget.vocab['text'] ?? '').toString().trim();
   String get _word => (widget.vocab['word'] ?? '').toString().trim();
+  String get _existingTranslation =>
+      (widget.vocab['translation'] ?? '').toString().trim();
 
   @override
   void initState() {
     super.initState();
-    _translate();
+
+    // ✅ CACHE HIT: já existe tradução no DB
+    if (_existingTranslation.isNotEmpty) {
+      print('📦 Translation loaded from DB | id=${widget.vocab['id']}');
+      print('   PT: $_existingTranslation');
+
+      _translated = _existingTranslation;
+
+      // 🔹 garante highlight da WORD mesmo em cache hit
+      if (_word.isNotEmpty) {
+        translator
+            .translate(_word, from: 'en', to: 'pt')
+            .then((res) {
+          if (!mounted) return;
+          setState(() {
+            _wordPt = res.text.trim();
+          });
+          print('🟡 WORD highlight from cache | $_word → $_wordPt');
+        });
+      }
+
+      _loading = false;
+    }
+    else {
+      _translateAndPersist();
+    }
   }
 
-  Future<void> _translate() async {
+  Future<void> _translateAndPersist() async {
     setState(() {
       _loading = true;
       _error = null;
@@ -47,14 +76,17 @@ class _TranslationScreenState extends State<TranslationScreen> {
         return;
       }
 
-      // 1) traduz a frase
+      print('🌍 Translating vocabulary | id=${widget.vocab['id']}');
+      print('   WORD: $_word');
+
+      // 1) traduz o texto completo
       final resText = await translator.translate(
         _originalText,
         from: 'en',
         to: 'pt',
       );
 
-      // 2) traduz a WORD separadamente (melhor pra destacar)
+      // 2) traduz a palavra isolada
       String wordPt = '';
       if (_word.isNotEmpty) {
         final resWord = await translator.translate(
@@ -65,12 +97,24 @@ class _TranslationScreenState extends State<TranslationScreen> {
         wordPt = resWord.text.trim();
       }
 
+      final translatedText = resText.text.trim();
+
+      // 3) persiste no Supabase
+      await supabase
+          .from('vocabulary')
+          .update({'translation': translatedText})
+          .eq('id', widget.vocab['id']);
+
+      print('💾 Translation saved | id=${widget.vocab['id']}');
+      print('   PT: $translatedText');
+
       setState(() {
-        _translated = resText.text.trim();
+        _translated = translatedText;
         _wordPt = wordPt;
         _loading = false;
       });
     } catch (e) {
+      print('❌ Translation error | id=${widget.vocab['id']} | $e');
       setState(() {
         _error = 'Falha ao traduzir: $e';
         _loading = false;
@@ -88,7 +132,6 @@ class _TranslationScreenState extends State<TranslationScreen> {
       return TextSpan(text: text, style: normalStyle);
     }
 
-    // tenta achar o primeiro highlight que aparece
     String? match;
     for (final h in highlights) {
       final hh = h.trim();
@@ -201,7 +244,8 @@ class _TranslationScreenState extends State<TranslationScreen> {
                             children: [
                               if (_wordPt.isNotEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
+                                  padding:
+                                      const EdgeInsets.only(bottom: 10),
                                   child: Text(
                                     _wordPt,
                                     style: const TextStyle(
@@ -225,19 +269,6 @@ class _TranslationScreenState extends State<TranslationScreen> {
                               ),
                             ],
                           ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _translate,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A1A1A),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text('Traduzir novamente'),
               ),
             ),
           ],

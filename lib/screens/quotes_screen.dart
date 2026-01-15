@@ -3,7 +3,7 @@ import '../widgets/quote_card.dart';
 import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';
-import 'vocabulary_screen.dart';
+import 'study_vocabulary_screen.dart';
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -40,9 +40,6 @@ class _QuotesScreenState extends State<QuotesScreen> {
 
     List<Map<String, dynamic>> result;
 
-    // ============================================================
-    // 📦 MODO ARQUIVO (INATIVAS)
-    // ============================================================
     if (_showInactive) {
       debugPrint('🔎 BUSCA: modo ARQUIVO (inativas)');
 
@@ -62,12 +59,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
       }).toList();
 
       debugPrint('📦 Inativas encontradas: ${result.length}');
-    }
-
-    // ============================================================
-    // ⚡ MODO NORMAL (ATIVAS + CACHE)
-    // ============================================================
-    else {
+    } else {
       debugPrint('⚡ BUSCA: modo NORMAL (ativas + cache)');
 
       result = await QuotesSearchManager.search(
@@ -104,7 +96,7 @@ class _QuotesScreenState extends State<QuotesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const VocabularyScreen(),
+        builder: (_) => StudyVocabularyScreen(), // ✅ REMOVIDO const
       ),
     );
   }
@@ -112,6 +104,22 @@ class _QuotesScreenState extends State<QuotesScreen> {
   void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
     await _runSearch();
+  }
+
+  Widget _compactIcon({
+    required IconData icon,
+    required VoidCallback onPressed,
+    Color color = Colors.white70,
+  }) {
+    return SizedBox(
+      width: 32,
+      child: IconButton(
+        icon: Icon(icon, size: 18, color: color),
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+      ),
+    );
   }
 
   Widget _typeDot(int t, Color fill) {
@@ -196,60 +204,38 @@ class _QuotesScreenState extends State<QuotesScreen> {
               leadingAction: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    iconSize: 20,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(
-                      _showInactive
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: _showInactive
-                          ? Colors.amber
-                          : Colors.white38,
-                    ),
+                  _compactIcon(
+                    icon: _showInactive
+                        ? Icons.visibility
+                        : Icons.visibility_off,
+                    color: _showInactive
+                        ? Colors.amber
+                        : Colors.white38,
                     onPressed: _toggleArchiveMode,
                   ),
-                  IconButton(
-                    iconSize: 20,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(
-                      Icons.abc,
-                      color: Colors.white38,
-                    ),
+                  _compactIcon(
+                    icon: Icons.abc,
+                    color: Colors.white38,
                     onPressed: _openVocabulary,
                   ),
                 ],
               ),
               trailingActions: [
-                IconButton(
-                  iconSize: 20,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon:
-                      const Icon(Icons.refresh, color: Colors.white70),
+                _compactIcon(
+                  icon: Icons.refresh,
                   onPressed: () async {
                     await QuotesCacheManager.clearCache(
                         _activeCacheKey);
                     await _runSearch(forceRefresh: true);
                   },
                 ),
-                IconButton(
-                  iconSize: 20,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon:
-                      const Icon(Icons.shuffle, color: Colors.white70),
+                _compactIcon(
+                  icon: Icons.shuffle,
                   onPressed: () =>
                       _changeSortMode('random'),
                 ),
-                IconButton(
-                  iconSize: 20,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.arrow_upward,
-                      color: Colors.white70),
+                _compactIcon(
+                  icon: Icons.arrow_upward,
                   onPressed: () =>
                       _changeSortMode('one_per_book_desc'),
                 ),
