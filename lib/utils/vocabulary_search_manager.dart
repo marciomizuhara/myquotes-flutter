@@ -10,7 +10,7 @@ class VocabularySearchManager {
     final term = rawTerm?.trim();
 
     var query = supabase.from('vocabulary').select(
-      'id, text, word, translation, notes, page, is_favorite::int, is_active, book_id, books(title, author, cover)',
+      'id, text, word, translation, translated_word, notes, page, is_favorite::int, is_active, book_id, books(title, author, cover)',
     );
 
     if (bookId != null) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:translator/translator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'cached_cover_image.dart';
 
 class StudyVocabularyCard extends StatefulWidget {
@@ -16,13 +17,29 @@ class StudyVocabularyCard extends StatefulWidget {
 
 class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   final translator = GoogleTranslator();
+  final supabase = Supabase.instance.client;
 
   String _wordPt = '';
   bool _loadingWordPt = false;
 
+  bool _editingEn = false;
+  bool _editingPt = false;
+
+  late TextEditingController _enCtrl;
+  late TextEditingController _ptCtrl;
+  late TextEditingController _translatedWordCtrl;
+
   String get _word => (widget.vocab['word'] ?? '').toString().trim();
   String get _textEn => (widget.vocab['text'] ?? '').toString().trim();
   String get _textPt => (widget.vocab['translation'] ?? '').toString().trim();
+
+  String get _ptHighlight {
+    final forced =
+        (widget.vocab['translated_word'] ?? '').toString().trim();
+    if (forced.isNotEmpty) return forced;
+    if (_wordPt.isNotEmpty) return _wordPt;
+    return '';
+  }
 
   Map<String, dynamic> get _book =>
       (widget.vocab['books'] is Map<String, dynamic>)
@@ -34,33 +51,67 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   @override
   void initState() {
     super.initState();
+
+    _enCtrl = TextEditingController(text: _textEn);
+    _ptCtrl = TextEditingController(text: _textPt);
+    _translatedWordCtrl = TextEditingController(
+      text: (widget.vocab['translated_word'] ?? '').toString(),
+    );
+
     _loadWordPt();
   }
 
-  Future<void> _loadWordPt() async {
-    if (_loadingWordPt) return;
+  @override
+  void dispose() {
+    _enCtrl.dispose();
+    _ptCtrl.dispose();
+    _translatedWordCtrl.dispose();
+    super.dispose();
+  }
 
-    final w = _word;
-    if (w.isEmpty) return;
+  Future<void> _loadWordPt() async {
+    if (_loadingWordPt || _word.isEmpty) return;
 
     setState(() => _loadingWordPt = true);
 
     try {
-      final res = await translator.translate(w, from: 'en', to: 'pt');
-      final pt = res.text.trim();
-
+      final res = await translator.translate(_word, from: 'en', to: 'pt');
       if (!mounted) return;
 
       setState(() {
-        _wordPt = pt;
+        _wordPt = res.text.trim();
         _loadingWordPt = false;
       });
-
-      // print('🟡 STUDY highlight word | $w → $_wordPt');
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingWordPt = false);
     }
+  }
+
+  Future<void> _saveEn() async {
+    final text = _enCtrl.text.trim();
+
+    await supabase
+        .from('vocabulary')
+        .update({'text': text})
+        .eq('id', widget.vocab['id']);
+
+    widget.vocab['text'] = text;
+    setState(() => _editingEn = false);
+  }
+
+  Future<void> _savePt() async {
+    final text = _ptCtrl.text.trim();
+    final forced = _translatedWordCtrl.text.trim();
+
+    await supabase.from('vocabulary').update({
+      'translation': text,
+      'translated_word': forced.isEmpty ? null : forced,
+    }).eq('id', widget.vocab['id']);
+
+    widget.vocab['translation'] = text;
+    widget.vocab['translated_word'] = forced;
+    setState(() => _editingPt = false);
   }
 
   TextSpan _highlightedSpan({
@@ -90,13 +141,8 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
     }
 
     final lower = text.toLowerCase();
-    final lowerMatch = match.toLowerCase();
-    final start = lower.indexOf(lowerMatch);
+    final start = lower.indexOf(match.toLowerCase());
     final end = start + match.length;
-
-    if (start < 0) {
-      return TextSpan(text: text, style: normalStyle);
-    }
 
     return TextSpan(
       children: [
@@ -111,24 +157,28 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   Widget build(BuildContext context) {
     const normalEnStyle = TextStyle(
       color: Colors.white,
-      height: 1.35,
+      height: 1.2,
       fontSize: 14,
     );
 
     const normalPtStyle = TextStyle(
       color: Colors.white70,
-      height: 1.35,
+      height: 1.2,
       fontSize: 13,
       fontStyle: FontStyle.italic,
       fontWeight: FontWeight.w400,
     );
 
-    const highlightPtStyle = TextStyle(
+    const highlightStyle = TextStyle(
       color: Colors.amberAccent,
       fontWeight: FontWeight.w700,
-      fontStyle: FontStyle.italic,
-      height: 1.35,
-      fontSize: 13,
+      height: 1.2,
+    );
+
+    const mainWordStyle = TextStyle(
+      color: Colors.white70,
+      fontWeight: FontWeight.w700,
+      fontSize: 15,
     );
 
     return Card(
@@ -156,45 +206,128 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                 children: [
                   if (_word.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(
-                        _word,
-                        style: const TextStyle(
-                          color: Colors.amberAccent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(_word, style: mainWordStyle),
                     ),
 
-                  // ✅ EN: full branco, sem highlight
+                  // EN
                   if (_textEn.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Text(
-                        _textEn,
-                        style: normalEnStyle,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _editingEn
+                              ? TextField(
+                                  controller: _enCtrl,
+                                  maxLines: null,
+                                  style: normalEnStyle,
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                )
+                              : Text.rich(
+                                  _highlightedSpan(
+                                    text: _textEn,
+                                    highlights: [_word],
+                                    normalStyle: normalEnStyle,
+                                    highlightStyle: highlightStyle,
+                                  ),
+                                  textHeightBehavior:
+                                      const TextHeightBehavior(
+                                    applyHeightToFirstAscent: false,
+                                    applyHeightToLastDescent: false,
+                                  ),
+                                ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _editingEn ? Icons.check : Icons.edit_note,
+                            size: 18,
+                            color: _editingEn
+                                ? Colors.amberAccent
+                                : Colors.white54,
+                          ),
+                          onPressed: _editingEn
+                              ? _saveEn
+                              : () =>
+                                  setState(() => _editingEn = true),
+                        ),
+                      ],
                     ),
 
-                  // ✅ PT: highlight só da palavra traduzida (_wordPt)
+                  // PT
                   if (_textPt.isNotEmpty)
-                    (_wordPt.isNotEmpty &&
-                            _textPt
-                                .toLowerCase()
-                                .contains(_wordPt.toLowerCase()))
-                        ? RichText(
-                            text: _highlightedSpan(
-                              text: _textPt,
-                              highlights: [_wordPt],
-                              normalStyle: normalPtStyle,
-                              highlightStyle: highlightPtStyle,
-                            ),
-                          )
-                        : Text(
-                            _textPt,
-                            style: normalPtStyle,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _editingPt
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    TextField(
+                                      controller: _ptCtrl,
+                                      maxLines: null,
+                                      style: normalPtStyle,
+                                      decoration:
+                                          const InputDecoration(
+                                        isDense: true,
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            EdgeInsets.zero,
+                                      ),
+                                    ),
+                                    TextField(
+                                      controller:
+                                          _translatedWordCtrl,
+                                      style: normalPtStyle,
+                                      decoration:
+                                          const InputDecoration(
+                                        hintText:
+                                            'termo a destacar',
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text.rich(
+                                  _highlightedSpan(
+                                    text: _textPt,
+                                    highlights: [_ptHighlight],
+                                    normalStyle: normalPtStyle,
+                                    highlightStyle:
+                                        highlightStyle.copyWith(
+                                      fontStyle:
+                                          FontStyle.italic,
+                                    ),
+                                  ),
+                                  textHeightBehavior:
+                                      const TextHeightBehavior(
+                                    applyHeightToFirstAscent:
+                                        false,
+                                    applyHeightToLastDescent:
+                                        false,
+                                  ),
+                                ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _editingPt ? Icons.check : Icons.edit_note,
+                            size: 18,
+                            color: _editingPt
+                                ? Colors.amberAccent
+                                : Colors.white54,
                           ),
+                          onPressed: _editingPt
+                              ? _savePt
+                              : () =>
+                                  setState(() => _editingPt = true),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

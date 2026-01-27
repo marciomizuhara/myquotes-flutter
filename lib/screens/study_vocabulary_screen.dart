@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/vocabulary_search_manager.dart';
 import '../widgets/study_vocabulary_card.dart';
+import '../utils/translation_service.dart';
 import 'anki_vocabulary_screen.dart';
 
 class StudyVocabularyScreen extends StatefulWidget {
@@ -13,6 +15,7 @@ class StudyVocabularyScreen extends StatefulWidget {
 
 class _StudyVocabularyScreenState extends State<StudyVocabularyScreen> {
   final searchCtrl = TextEditingController();
+  final supabase = Supabase.instance.client;
 
   bool isLoading = true;
   List<Map<String, dynamic>> vocabulary = [];
@@ -31,7 +34,45 @@ class _StudyVocabularyScreenState extends State<StudyVocabularyScreen> {
     );
 
     vocabulary = result;
+
+    // 🔹 garante que todas tenham tradução persistida
+    await _populateMissingTranslations(vocabulary);
+
     setState(() => isLoading = false);
+  }
+
+  Future<void> _populateMissingTranslations(
+    List<Map<String, dynamic>> items,
+  ) async {
+    for (final v in items) {
+      final id = v['id'];
+      final textEn = (v['text'] ?? '').toString().trim();
+      final existingPt =
+          (v['translation'] ?? '').toString().trim();
+
+      if (textEn.isEmpty || existingPt.isNotEmpty) {
+        continue;
+      }
+
+      try {
+        print('🌍 STUDY ETL | Translating id=$id');
+
+        final pt = await TranslationService.translateToPtBr(
+          text: textEn,
+        );
+
+        await supabase
+            .from('vocabulary')
+            .update({'translation': pt})
+            .eq('id', id);
+
+        v['translation'] = pt;
+
+        print('💾 STUDY ETL | Saved translation id=$id');
+      } catch (e) {
+        print('❌ STUDY ETL | Failed id=$id | $e');
+      }
+    }
   }
 
   void _openAnkiMode() {
@@ -97,7 +138,6 @@ class _StudyVocabularyScreenState extends State<StudyVocabularyScreen> {
                     itemCount: vocabulary.length,
                     itemBuilder: (context, i) {
                       final v = vocabulary[i];
-                      // 🔒 leitura passiva: sem GestureDetector
                       return StudyVocabularyCard(vocab: v);
                     },
                   ),
