@@ -5,10 +5,14 @@ import 'cached_cover_image.dart';
 
 class StudyVocabularyCard extends StatefulWidget {
   final Map<String, dynamic> vocab;
+  final bool showTranslation;
+  final bool enableCrud;
 
   const StudyVocabularyCard({
     Key? key,
     required this.vocab,
+    this.showTranslation = true,
+    this.enableCrud = true,
   }) : super(key: key);
 
   @override
@@ -32,21 +36,34 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   String get _word => (widget.vocab['word'] ?? '').toString().trim();
   String get _textEn => (widget.vocab['text'] ?? '').toString().trim();
   String get _textPt => (widget.vocab['translation'] ?? '').toString().trim();
+  String get _status => (widget.vocab['status'] ?? '').toString().trim();
 
   String get _ptHighlight {
-    final forced =
-        (widget.vocab['translated_word'] ?? '').toString().trim();
+    final forced = (widget.vocab['translated_word'] ?? '').toString().trim();
     if (forced.isNotEmpty) return forced;
     if (_wordPt.isNotEmpty) return _wordPt;
     return '';
   }
 
   Map<String, dynamic> get _book =>
-      (widget.vocab['books'] is Map<String, dynamic>)
-          ? widget.vocab['books']
-          : {};
+      (widget.vocab['books'] is Map<String, dynamic>) ? widget.vocab['books'] : {};
 
   String get _cover => (_book['cover'] ?? '').toString();
+
+  Color _statusBorderColor() {
+    switch (_status) {
+      case 'again':
+        return Colors.red.shade700;
+      case 'hard':
+        return Colors.orange.shade700;
+      case 'good':
+        return Colors.amberAccent; // mantém good em amarelo
+      case 'easy':
+        return Colors.green.shade700;
+      default:
+        return Colors.transparent;
+    }
+  }
 
   @override
   void initState() {
@@ -91,10 +108,7 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   Future<void> _saveEn() async {
     final text = _enCtrl.text.trim();
 
-    await supabase
-        .from('vocabulary')
-        .update({'text': text})
-        .eq('id', widget.vocab['id']);
+    await supabase.from('vocabulary').update({'text': text}).eq('id', widget.vocab['id']);
 
     widget.vocab['text'] = text;
     setState(() => _editingEn = false);
@@ -181,10 +195,16 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
       fontSize: 15,
     );
 
+    final borderColor = _statusBorderColor();
+
     return Card(
-      color: const Color(0xFF1A1A1A),
+      color: const Color(0xFF1A1A1A), // fundo fixo
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: borderColor,
+          width: borderColor == Colors.transparent ? 0 : 2,
+        ),
       ),
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: Padding(
@@ -199,7 +219,9 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                 height: 68,
                 borderRadius: BorderRadius.circular(6),
               ),
+
             if (_cover.isNotEmpty) const SizedBox(width: 10),
+
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -234,31 +256,29 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                                     normalStyle: normalEnStyle,
                                     highlightStyle: highlightStyle,
                                   ),
-                                  textHeightBehavior:
-                                      const TextHeightBehavior(
-                                    applyHeightToFirstAscent: false,
-                                    applyHeightToLastDescent: false,
-                                  ),
                                 ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            _editingEn ? Icons.check : Icons.edit_note,
-                            size: 18,
-                            color: _editingEn
-                                ? Colors.amberAccent
-                                : Colors.white54,
+                        if (widget.enableCrud)
+                          IconButton(
+                            icon: Icon(
+                              _editingEn
+                                  ? Icons.check
+                                  : Icons.edit_note,
+                              size: 18,
+                              color: _editingEn
+                                  ? Colors.amberAccent
+                                  : Colors.white54,
+                            ),
+                            onPressed: _editingEn
+                                ? _saveEn
+                                : () =>
+                                    setState(() => _editingEn = true),
                           ),
-                          onPressed: _editingEn
-                              ? _saveEn
-                              : () =>
-                                  setState(() => _editingEn = true),
-                        ),
                       ],
                     ),
 
                   // PT
-                  if (_textPt.isNotEmpty)
+                  if (widget.showTranslation && _textPt.isNotEmpty)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -304,28 +324,24 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                                           FontStyle.italic,
                                     ),
                                   ),
-                                  textHeightBehavior:
-                                      const TextHeightBehavior(
-                                    applyHeightToFirstAscent:
-                                        false,
-                                    applyHeightToLastDescent:
-                                        false,
-                                  ),
                                 ),
                         ),
-                        IconButton(
-                          icon: Icon(
-                            _editingPt ? Icons.check : Icons.edit_note,
-                            size: 18,
-                            color: _editingPt
-                                ? Colors.amberAccent
-                                : Colors.white54,
+                        if (widget.enableCrud)
+                          IconButton(
+                            icon: Icon(
+                              _editingPt
+                                  ? Icons.check
+                                  : Icons.edit_note,
+                              size: 18,
+                              color: _editingPt
+                                  ? Colors.amberAccent
+                                  : Colors.white54,
+                            ),
+                            onPressed: _editingPt
+                                ? _savePt
+                                : () =>
+                                    setState(() => _editingPt = true),
                           ),
-                          onPressed: _editingPt
-                              ? _savePt
-                              : () =>
-                                  setState(() => _editingPt = true),
-                        ),
                       ],
                     ),
                 ],

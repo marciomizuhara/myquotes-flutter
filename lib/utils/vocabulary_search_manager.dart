@@ -10,7 +10,7 @@ class VocabularySearchManager {
     final term = rawTerm?.trim();
 
     var query = supabase.from('vocabulary').select(
-      'id, text, word, translation, translated_word, notes, page, is_favorite::int, is_active, book_id, books(title, author, cover)',
+      'id, text, word, translation, translated_word, status, notes, page, is_favorite::int, is_active, book_id, books(title, author, cover)',
     );
 
     if (bookId != null) {
@@ -21,9 +21,10 @@ class VocabularySearchManager {
       query = query.or('text.ilike.%$term%,word.ilike.%$term%');
     }
 
+    // sempre determinístico no backend
     final data = await query.order('id');
 
-    return data.map<Map<String, dynamic>>((e) {
+    final list = data.map<Map<String, dynamic>>((e) {
       final v = Map<String, dynamic>.from(e);
 
       v['is_active'] =
@@ -32,10 +33,21 @@ class VocabularySearchManager {
       v['is_favorite'] =
           v['is_favorite'] == true || v['is_favorite'] == 1 ? 1 : 0;
 
-      // translation é apenas lida aqui, nunca criada
       v['translation'] = (v['translation'] ?? '').toString();
+      v['translated_word'] =
+          (v['translated_word'] ?? '').toString();
+
+      // 🧠 status Anki-like (again | hard | good | easy)
+      v['status'] = (v['status'] ?? '').toString();
 
       return v;
     }).toList();
+
+    // 🎲 aleatoriza SOMENTE quando não há busca
+    if (term == null || term.isEmpty) {
+      list.shuffle();
+    }
+
+    return list;
   }
 }

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../utils/vocabulary_search_manager.dart';
-import '../widgets/vocabulary_card.dart';
-import 'translation_screen.dart';
+import '../widgets/study_vocabulary_card.dart';
+import 'anki_card_screen.dart';
+import 'study_vocabulary_screen.dart';
+
 
 class AnkiVocabularyScreen extends StatefulWidget {
   const AnkiVocabularyScreen({Key? key}) : super(key: key);
 
   @override
-  State<AnkiVocabularyScreen> createState() => _AnkiVocabularyScreenState();
+  State<AnkiVocabularyScreen> createState() =>
+      _AnkiVocabularyScreenState();
 }
 
 class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
@@ -22,6 +25,16 @@ class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
     _loadVocabulary();
   }
 
+  void _openStudy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StudyVocabularyScreen(),
+      ),
+    );
+  }
+
+
   Future<void> _loadVocabulary() async {
     setState(() => isLoading = true);
 
@@ -33,13 +46,19 @@ class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
     setState(() => isLoading = false);
   }
 
-  void _openTranslation(Map<String, dynamic> vocab) {
-    Navigator.push(
+  Future<void> _openTranslation(Map<String, dynamic> vocab) async {
+    final newStatus = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => TranslationScreen(vocab: vocab),
+        builder: (_) => AnkiCardScreen(vocab: vocab),
       ),
     );
+
+    if (newStatus != null) {
+      setState(() {
+        vocab['status'] = newStatus;
+      });
+    }
   }
 
   @override
@@ -49,7 +68,15 @@ class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
       appBar: AppBar(
         title: const Text('ANKI Mode'),
         backgroundColor: const Color(0xFF121212),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.menu_book), // 📖 Study
+            tooltip: 'Study vocabulary',
+            onPressed: _openStudy,
+          ),
+        ],
       ),
+
       body: Column(
         children: [
           Padding(
@@ -92,8 +119,10 @@ class _AnkiVocabularyScreenState extends State<AnkiVocabularyScreen> {
                       final v = vocabulary[i];
                       return GestureDetector(
                         onTap: () => _openTranslation(v),
-                        child: VocabularyCard(
+                        child: StudyVocabularyCard(
                           vocab: v,
+                          showTranslation: false,
+                          enableCrud: false,
                         ),
                       );
                     },

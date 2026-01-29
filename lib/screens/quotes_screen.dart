@@ -3,7 +3,7 @@ import '../widgets/quote_card.dart';
 import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';
-import 'study_vocabulary_screen.dart';
+import 'anki_vocabulary_screen.dart';
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -92,14 +92,15 @@ class _QuotesScreenState extends State<QuotesScreen> {
     await _runSearch(forceRefresh: _showInactive);
   }
 
-  void _openVocabulary() {
+  void _openAnki() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => StudyVocabularyScreen(), // ✅ REMOVIDO const
+        builder: (_) => const AnkiVocabularyScreen(),
       ),
     );
   }
+
 
   void _changeSortMode(String mode) async {
     setState(() => _sortMode = mode);
@@ -214,9 +215,9 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     onPressed: _toggleArchiveMode,
                   ),
                   _compactIcon(
-                    icon: Icons.abc,
+                    icon: Icons.school, // 🎓 ANKI
                     color: Colors.white38,
-                    onPressed: _openVocabulary,
+                    onPressed: _openAnki,
                   ),
                 ],
               ),
