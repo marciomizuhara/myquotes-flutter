@@ -4,6 +4,8 @@ import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';
 import 'anki_vocabulary_screen.dart';
+import 'study_vocabulary_screen.dart';
+
 
 class QuotesScreen extends StatefulWidget {
   const QuotesScreen({Key? key}) : super(key: key);
@@ -97,6 +99,15 @@ class _QuotesScreenState extends State<QuotesScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => const AnkiVocabularyScreen(),
+      ),
+    );
+  }
+
+  void _openStudy() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StudyVocabularyScreen(),
       ),
     );
   }
@@ -206,18 +217,23 @@ class _QuotesScreenState extends State<QuotesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _compactIcon(
-                    icon: _showInactive
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                    color: _showInactive
-                        ? Colors.amber
-                        : Colors.white38,
-                    onPressed: _toggleArchiveMode,
+                    icon: Icons.menu_book, // 📘 STUDY
+                    color: Colors.white38,
+                    onPressed: _openStudy,
                   ),
                   _compactIcon(
                     icon: Icons.school, // 🎓 ANKI
                     color: Colors.white38,
                     onPressed: _openAnki,
+                  ),
+                  _compactIcon(
+                      icon: _showInactive
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: _showInactive
+                          ? Colors.amber
+                          : Colors.white38,
+                      onPressed: _toggleArchiveMode,
                   ),
                 ],
               ),

@@ -198,14 +198,17 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
     final borderColor = _statusBorderColor();
 
     return Card(
-      color: const Color(0xFF1A1A1A), // fundo fixo
+      color: const Color(0xFF1A1A1A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(
-          color: borderColor,
-          width: borderColor == Colors.transparent ? 0 : 2,
-        ),
+        side: widget.showTranslation
+            ? BorderSide.none
+            : BorderSide(
+                color: borderColor,
+                width: borderColor == Colors.transparent ? 0 : 2,
+              ),
       ),
+
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: Padding(
         padding: const EdgeInsets.all(10),
