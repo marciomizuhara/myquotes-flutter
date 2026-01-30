@@ -26,9 +26,11 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   String _wordPt = '';
   bool _loadingWordPt = false;
 
+  bool _editingWord = false;
   bool _editingEn = false;
   bool _editingPt = false;
 
+  late TextEditingController _wordCtrl;
   late TextEditingController _enCtrl;
   late TextEditingController _ptCtrl;
   late TextEditingController _translatedWordCtrl;
@@ -46,7 +48,9 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   }
 
   Map<String, dynamic> get _book =>
-      (widget.vocab['books'] is Map<String, dynamic>) ? widget.vocab['books'] : {};
+      (widget.vocab['books'] is Map<String, dynamic>)
+          ? widget.vocab['books']
+          : {};
 
   String get _cover => (_book['cover'] ?? '').toString();
 
@@ -57,7 +61,7 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
       case 'hard':
         return Colors.orange.shade700;
       case 'good':
-        return Colors.amberAccent; // mantém good em amarelo
+        return Colors.amberAccent;
       case 'easy':
         return Colors.green.shade700;
       default:
@@ -69,6 +73,7 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   void initState() {
     super.initState();
 
+    _wordCtrl = TextEditingController(text: _word);
     _enCtrl = TextEditingController(text: _textEn);
     _ptCtrl = TextEditingController(text: _textPt);
     _translatedWordCtrl = TextEditingController(
@@ -80,6 +85,7 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
 
   @override
   void dispose() {
+    _wordCtrl.dispose();
     _enCtrl.dispose();
     _ptCtrl.dispose();
     _translatedWordCtrl.dispose();
@@ -105,10 +111,26 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
     }
   }
 
+  Future<void> _saveWord() async {
+    final text = _wordCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    await supabase
+        .from('vocabulary')
+        .update({'word': text})
+        .eq('id', widget.vocab['id']);
+
+    widget.vocab['word'] = text;
+    setState(() => _editingWord = false);
+  }
+
   Future<void> _saveEn() async {
     final text = _enCtrl.text.trim();
 
-    await supabase.from('vocabulary').update({'text': text}).eq('id', widget.vocab['id']);
+    await supabase
+        .from('vocabulary')
+        .update({'text': text})
+        .eq('id', widget.vocab['id']);
 
     widget.vocab['text'] = text;
     setState(() => _editingEn = false);
@@ -169,6 +191,12 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
 
   @override
   Widget build(BuildContext context) {
+    const wordStyle = TextStyle(
+      color: Colors.white70,
+      fontWeight: FontWeight.w500,
+      fontSize: 14,
+    );
+
     const normalEnStyle = TextStyle(
       color: Colors.white,
       height: 1.2,
@@ -189,11 +217,11 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
       height: 1.2,
     );
 
-    const mainWordStyle = TextStyle(
-      color: Colors.white70,
-      fontWeight: FontWeight.w700,
-      fontSize: 15,
+    const forcedHighlightInputStyle = TextStyle(
+      color: Colors.amberAccent,
+      fontWeight: FontWeight.w600,
     );
+
 
     final borderColor = _statusBorderColor();
 
@@ -208,7 +236,6 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                 width: borderColor == Colors.transparent ? 0 : 2,
               ),
       ),
-
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -222,130 +249,136 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                 height: 68,
                 borderRadius: BorderRadius.circular(6),
               ),
-
             if (_cover.isNotEmpty) const SizedBox(width: 10),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // TERMO
                   if (_word.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(_word, style: mainWordStyle),
+                    GestureDetector(
+                      onLongPress: widget.enableCrud
+                          ? () => setState(() => _editingWord = true)
+                          : null,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _editingWord
+                                ? TextField(
+                                    controller: _wordCtrl,
+                                    style: wordStyle,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                    ),
+                                  )
+                                : Text(
+                                    _word.toUpperCase(),
+                                    style: wordStyle,
+                                  ),
+                          ),
+                          if (_editingWord)
+                            IconButton(
+                              icon: const Icon(Icons.check, size: 18),
+                              color: Colors.amberAccent,
+                              onPressed: _saveWord,
+                            ),
+                        ],
+                      ),
                     ),
 
                   // EN
                   if (_textEn.isNotEmpty)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _editingEn
-                              ? TextField(
-                                  controller: _enCtrl,
-                                  maxLines: null,
-                                  style: normalEnStyle,
-                                  decoration: const InputDecoration(
-                                    isDense: true,
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.zero,
+                    GestureDetector(
+                      onLongPress: widget.enableCrud
+                          ? () => setState(() => _editingEn = true)
+                          : null,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _editingEn
+                                ? TextField(
+                                    controller: _enCtrl,
+                                    maxLines: null,
+                                    style: normalEnStyle,
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                    ),
+                                  )
+                                : Text.rich(
+                                    _highlightedSpan(
+                                      text: _textEn,
+                                      highlights: [_word],
+                                      normalStyle: normalEnStyle,
+                                      highlightStyle: highlightStyle,
+                                    ),
                                   ),
-                                )
-                              : Text.rich(
-                                  _highlightedSpan(
-                                    text: _textEn,
-                                    highlights: [_word],
-                                    normalStyle: normalEnStyle,
-                                    highlightStyle: highlightStyle,
-                                  ),
-                                ),
-                        ),
-                        if (widget.enableCrud)
-                          IconButton(
-                            icon: Icon(
-                              _editingEn
-                                  ? Icons.check
-                                  : Icons.edit_note,
-                              size: 18,
-                              color: _editingEn
-                                  ? Colors.amberAccent
-                                  : Colors.white54,
-                            ),
-                            onPressed: _editingEn
-                                ? _saveEn
-                                : () =>
-                                    setState(() => _editingEn = true),
                           ),
-                      ],
+                          if (_editingEn)
+                            IconButton(
+                              icon: const Icon(Icons.check, size: 18),
+                              color: Colors.amberAccent,
+                              onPressed: _saveEn,
+                            ),
+                        ],
+                      ),
                     ),
 
                   // PT
                   if (widget.showTranslation && _textPt.isNotEmpty)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _editingPt
-                              ? Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    TextField(
-                                      controller: _ptCtrl,
-                                      maxLines: null,
-                                      style: normalPtStyle,
-                                      decoration:
-                                          const InputDecoration(
-                                        isDense: true,
-                                        border: InputBorder.none,
-                                        contentPadding:
-                                            EdgeInsets.zero,
+                    GestureDetector(
+                      onLongPress: widget.enableCrud
+                          ? () => setState(() => _editingPt = true)
+                          : null,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _editingPt
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      TextField(
+                                        controller: _ptCtrl,
+                                        maxLines: null,
+                                        style: normalPtStyle,
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          border: InputBorder.none,
+                                        ),
                                       ),
-                                    ),
-                                    TextField(
-                                      controller:
-                                          _translatedWordCtrl,
-                                      style: normalPtStyle,
-                                      decoration:
-                                          const InputDecoration(
-                                        hintText:
-                                            'termo a destacar',
-                                        isDense: true,
+                                      TextField(
+                                        controller: _translatedWordCtrl,
+                                        style: forcedHighlightInputStyle,
+                                        decoration: const InputDecoration(
+                                          hintText: 'termo a destacar',
+                                          hintStyle: TextStyle(color: Colors.white38),
+                                          isDense: true,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                )
-                              : Text.rich(
-                                  _highlightedSpan(
-                                    text: _textPt,
-                                    highlights: [_ptHighlight],
-                                    normalStyle: normalPtStyle,
-                                    highlightStyle:
-                                        highlightStyle.copyWith(
-                                      fontStyle:
-                                          FontStyle.italic,
+                                    ],
+                                  )
+                                : Text.rich(
+                                    _highlightedSpan(
+                                      text: _textPt,
+                                      highlights: [_ptHighlight],
+                                      normalStyle: normalPtStyle,
+                                      highlightStyle: highlightStyle.copyWith(
+                                        fontStyle: FontStyle.italic,
+                                      ),
                                     ),
                                   ),
-                                ),
-                        ),
-                        if (widget.enableCrud)
-                          IconButton(
-                            icon: Icon(
-                              _editingPt
-                                  ? Icons.check
-                                  : Icons.edit_note,
-                              size: 18,
-                              color: _editingPt
-                                  ? Colors.amberAccent
-                                  : Colors.white54,
-                            ),
-                            onPressed: _editingPt
-                                ? _savePt
-                                : () =>
-                                    setState(() => _editingPt = true),
                           ),
-                      ],
+                          if (_editingPt)
+                            IconButton(
+                              icon: const Icon(Icons.check, size: 18),
+                              color: Colors.amberAccent,
+                              onPressed: _savePt,
+                            ),
+                        ],
+                      ),
                     ),
                 ],
               ),
