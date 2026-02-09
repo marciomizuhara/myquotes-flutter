@@ -25,6 +25,11 @@ class _QuoteCardState extends State<QuoteCard> {
   final supabase = Supabase.instance.client;
 
   late TextEditingController _notesCtrl;
+
+  // 🔹 NOVO: controller da quote (para editar o texto da quote)
+  late TextEditingController _quoteCtrl;
+  bool _editingQuote = false;
+
   bool _editing = false;
   bool _saving = false;
   late bool _isFavorite;
@@ -36,8 +41,18 @@ class _QuoteCardState extends State<QuoteCard> {
     super.initState();
     _notesCtrl = TextEditingController(text: widget.quote['notes'] ?? '');
 
+    // 🔹 NOVO
+    _quoteCtrl = TextEditingController(text: widget.quote['text'] ?? '');
+
     final raw = widget.quote['is_favorite'];
     _isFavorite = raw == 1 || raw == true || raw == '1';
+  }
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    _quoteCtrl.dispose(); // 🔹 NOVO
+    super.dispose();
   }
 
   Future<void> _updateNotes(String newText) async {
@@ -51,6 +66,33 @@ class _QuoteCardState extends State<QuoteCard> {
           .eq('id', widget.quote['id']);
     } finally {
       setState(() => _saving = false);
+    }
+  }
+
+  // 🔹 NOVO: atualizar texto da quote
+  Future<void> _updateQuoteText(String newText) async {
+    if (_saving) return;
+
+    final trimmed = newText.trim();
+    if (trimmed.isEmpty) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await supabase
+          .from('quotes')
+          .update({'text': trimmed})
+          .eq('id', widget.quote['id']);
+
+      widget.quote['text'] = trimmed;
+      _quoteCtrl.text = trimmed;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _editingQuote = false;
+        });
+      }
     }
   }
 
@@ -246,11 +288,11 @@ class _QuoteCardState extends State<QuoteCard> {
     final color = colorByType(_safeType(q['type']));
     final note = _notesCtrl.text.trim();
 
-    final pageText = (q['page'] == null ||
-            q['page'].toString().trim().isEmpty ||
-            q['page'].toString() == 'null')
-        ? '--'
-        : q['page'].toString();
+//     final pageText = (q['page'] == null ||
+//             q['page'].toString().trim().isEmpty ||
+//             q['page'].toString() == 'null')
+//         ? '--'
+//         : q['page'].toString();
 
     return Card(
       color: color,
@@ -295,15 +337,76 @@ class _QuoteCardState extends State<QuoteCard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              q['text'] ?? '',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                height: 1.3,
-                                fontSize: 13.5,
-                                letterSpacing: 0.05,
+                            // =========================
+                            // 🔹 QUOTE TEXT + EDIT ICON
+                            // =========================
+                            if (_editingQuote)
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _quoteCtrl,
+                                      maxLines: null,
+                                      autofocus: true,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        height: 1.3,
+                                        fontSize: 13.5,
+                                        letterSpacing: 0.05,
+                                      ),
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.check,
+                                        color: Colors.green, size: 17),
+                                    onPressed: () async {
+                                      await _updateQuoteText(_quoteCtrl.text);
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close,
+                                        color: Colors.redAccent, size: 17),
+                                    onPressed: () {
+                                      _quoteCtrl.text =
+                                          (q['text'] ?? '').toString();
+                                      setState(() => _editingQuote = false);
+                                    },
+                                  ),
+                                ],
+                              )
+                            else
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      q['text'] ?? '',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        height: 1.3,
+                                        fontSize: 13.5,
+                                        letterSpacing: 0.05,
+                                      ),
+                                    ),
+                                  ),
+                                  // 🔹 lápis discreto ao final da quote
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_note,
+                                        color: Colors.white70, size: 17),
+                                    onPressed: () {
+                                      _quoteCtrl.text =
+                                          (q['text'] ?? '').toString();
+                                      setState(() => _editingQuote = true);
+                                    },
+                                  ),
+                                ],
                               ),
-                            ),
+
                             const SizedBox(height: 4),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.end,
@@ -333,8 +436,8 @@ class _QuoteCardState extends State<QuoteCard> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.only(
-                                      left: 4, bottom: 1),
+                                  padding:
+                                      const EdgeInsets.only(left: 4, bottom: 1),
                                   child: GestureDetector(
                                     onTap: () => TypeSelector.show(
                                       context,
@@ -350,13 +453,23 @@ class _QuoteCardState extends State<QuoteCard> {
                                             widget.quote['type'] = newType);
                                       },
                                     ),
-                                    child: Text(
-                                      'p. $pageText',
-                                      style: const TextStyle(
-                                        color: Colors.white54,
-                                        fontSize: 11,
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: Center(
+                                        child: Container(
+                                          width: 10,
+                                          height: 10,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: q['is_active'] == 1
+                                                ? Colors.white38
+                                                : Colors.redAccent,
+                                          ),
+                                        ),
                                       ),
                                     ),
+
                                   ),
                                 ),
                               ],
@@ -368,9 +481,7 @@ class _QuoteCardState extends State<QuoteCard> {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: _editing
-                        ? _buildEditRow(note)
-                        : _buildNormalRow(note),
+                    child: _editing ? _buildEditRow(note) : _buildNormalRow(note),
                   ),
                 ],
               ),
@@ -447,8 +558,7 @@ class _QuoteCardState extends State<QuoteCard> {
           },
         ),
         IconButton(
-          icon:
-              const Icon(Icons.close, color: Colors.redAccent, size: 17),
+          icon: const Icon(Icons.close, color: Colors.redAccent, size: 17),
           onPressed: () {
             _notesCtrl.text = note;
             setState(() => _editing = false);
@@ -462,8 +572,7 @@ class _QuoteCardState extends State<QuoteCard> {
     return Row(
       children: [
         IconButton(
-          icon:
-              const Icon(Icons.edit_note, color: Colors.white70, size: 17),
+          icon: const Icon(Icons.edit_note, color: Colors.white70, size: 17),
           onPressed: () => setState(() => _editing = true),
         ),
         Expanded(

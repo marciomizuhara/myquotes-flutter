@@ -40,12 +40,24 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
   String get _textPt => (widget.vocab['translation'] ?? '').toString().trim();
   String get _status => (widget.vocab['status'] ?? '').toString().trim();
 
-  String get _ptHighlight {
+  List<String> get _ptHighlights {
     final forced = (widget.vocab['translated_word'] ?? '').toString().trim();
-    if (forced.isNotEmpty) return forced;
-    if (_wordPt.isNotEmpty) return _wordPt;
-    return '';
+
+    if (forced.isNotEmpty) {
+      return forced
+          .split(';')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    if (_wordPt.isNotEmpty) {
+      return [_wordPt];
+    }
+
+    return [];
   }
+
 
   Map<String, dynamic> get _book =>
       (widget.vocab['books'] is Map<String, dynamic>)
@@ -363,7 +375,7 @@ class _StudyVocabularyCardState extends State<StudyVocabularyCard> {
                                 : Text.rich(
                                     _highlightedSpan(
                                       text: _textPt,
-                                      highlights: [_ptHighlight],
+                                      highlights: _ptHighlights,
                                       normalStyle: normalPtStyle,
                                       highlightStyle: highlightStyle.copyWith(
                                         fontStyle: FontStyle.italic,
