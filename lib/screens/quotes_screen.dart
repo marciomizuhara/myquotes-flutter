@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../widgets/quote_card.dart';
+import '../widgets/quote_card/quote_card.dart';
 import '../widgets/quotes_top_controls.dart';
 import '../utils/quotes_search_manager.dart';
 import '../utils/quotes_cache_manager.dart';

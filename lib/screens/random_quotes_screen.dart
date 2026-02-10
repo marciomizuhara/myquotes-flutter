@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/quote_card.dart';
+import '../widgets/quote_card/quote_card.dart';
 import '../utils/quotes_helper.dart';
 
 class RandomQuotesScreen extends StatefulWidget {

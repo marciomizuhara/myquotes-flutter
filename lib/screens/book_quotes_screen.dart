@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../widgets/quote_card.dart';
+import '../widgets/quote_card/quote_card.dart';
 import 'book_characters_screen.dart';
 import '../utils/quotes_cache_manager.dart';
 import '../utils/quotes_search_manager.dart';
